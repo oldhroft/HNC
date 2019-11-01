@@ -4,6 +4,7 @@ from tensorflow.keras.models import Sequential
 from anytree import Node
 
 from utils import *
+from voter import *
 
 
 class HierarchicalNeuralClassifier:
@@ -11,13 +12,14 @@ class HierarchicalNeuralClassifier:
     def __init__(
             self, units=3, activation='relu',
             optimizer='sgd', optimizer_params={},
-            other_rate=.1, regularization=None, timeout=10, start=5,
+            other_rate=.1, regularization=None,
+            timeout=10, start=5, max_epochs=20,
             threshold=.2, threshold_ratio=.5, validation_split=None,
             validation_data=None, patience=10, batch_size=32,
             loss='categorical_crossentropy'):
 
         self.units = units
-        self.activation = 'relu'
+        self.activation = activation
         self.optimizer_params = optimizer_params
         self.optimizer = optimizer
         self.regularization = regularization
@@ -30,6 +32,7 @@ class HierarchicalNeuralClassifier:
         self.patience = patience
         self.batch_size = batch_size
         self.loss = loss
+        self.max_epochs = max_epochs
 
     def _get_optimizer(self):
 
@@ -72,21 +75,34 @@ class HierarchicalNeuralClassifier:
         self.y = y
         self.input_shape = (X.shape[1],)
         classes = np.unique(y)
+        old_map = dict(zip(classes, classes))
 
         self.tree = Node(0)
         model = self._build_model(
-            self.units, self.input_shape, classes
+            self.units, self.input_shape, (len(classes),)
         )
-
         stop_flag = False
-        first_iteration = True
+        epoch = 0
 
-        while not stop_flag:
-            num_epochs = self.start if first_iteration else self.timeout
-            model.fit(X, y, epochs=num_epochs)
-            votes = model.predict(X)
+        while not stop_flag and epoch < self.max_epochs:
+            y_one_hot = to_one_hot(remap(y, old_map))
+            num_epochs = self.start if epoch == 0 else self.timeout
+            epoch += num_epochs
+
+            model.fit(X, y_one_hot, epochs=num_epochs, verbose=False)
+            print(f'epoch {epoch}')
+            y_pred = model.predict(X)
+            class_map = perform_voting(
+                y, y_pred, classes=classes, threshold=self.threshold,
+                threshold_ratio=self.threshold_ratio
+            )
+            if len(set(class_map.values())) == 2:
+                stop_flag = True
+
+            old_map = connect_map(old_map, class_map)
 
         self.models[0] = model
+        print(old_map)
 
         return self
 
