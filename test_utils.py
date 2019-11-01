@@ -3,7 +3,7 @@ import numpy as np
 from utils import *
 
 
-class TextUtils(unittest.TestCase):
+class TestUtils(unittest.TestCase):
 
     def test_connect_maps(self):
         self.assertEqual(
@@ -30,6 +30,18 @@ class TextUtils(unittest.TestCase):
             ),
             {1: [0, 1, 6], 0: [2], 2: [3, 5], 4: [4]}
         )
+
+    def test_one_hot(self):
+
+        y = np.array([0, 1, 0])
+        categories = [[0, 1, 2]]
+        result = np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [1, 0, 0]
+        ])
+
+        assert np.array_equal(to_one_hot(y, categories), result)
 
     def test_remap_and_one_hot(self):
         assert np.array_equal(

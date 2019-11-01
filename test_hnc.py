@@ -19,3 +19,15 @@ class HNCTester(unittest.TestCase):
         preds = nn.predict(X)
 
         self.assertEqual(preds.shape, (100, 3))
+
+    def test_fit_method(self):
+        X = np.random.normal(size=(100, 10))
+        y = np.random.choice([0, 1, 2], size=100)
+
+        model = HierarchicalNeuralClassifier()
+        model.fit(X, y)
+
+        self.assertEqual(
+            model.models[1].predict(X).shape,
+            to_one_hot(y).shape
+        )

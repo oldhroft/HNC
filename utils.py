@@ -35,6 +35,7 @@ def check_create_mask(y: np.array, classes: list) -> bool:
     if not len(classes) > 1:
         return False
     elif not set(classes) < set(y):
+        print(classes, set(y))
         return False
     else:
         return True

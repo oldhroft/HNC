@@ -14,8 +14,9 @@ class HierarchicalNeuralClassifier:
             optimizer='sgd', optimizer_params={},
             other_rate=.1, regularization=None,
             timeout=10, start=5, max_epochs=20,
-            threshold=.2, threshold_ratio=.5, validation_split=None,
-            validation_data=None, patience=10, batch_size=32,
+            threshold=.2, threshold_ratio=.5,
+            validation_split=None, validation_data=None,
+            patience=10, batch_size=32,
             loss='categorical_crossentropy'):
 
         self.units = units
@@ -33,6 +34,7 @@ class HierarchicalNeuralClassifier:
         self.batch_size = batch_size
         self.loss = loss
         self.max_epochs = max_epochs
+        self.other_rate = other_rate
 
     def _get_optimizer(self):
 
@@ -74,10 +76,22 @@ class HierarchicalNeuralClassifier:
         self.X = X
         self.y = y
         self.input_shape = (X.shape[1],)
-        classes = np.unique(y)
-        old_map = dict(zip(classes, classes))
-
         self.tree = Node(0)
+        classes = list(np.unique(y))
+        self._fit_node(classes, 1, 0)
+
+        return self
+
+    def _fit_terminal_node(self, classes, node_id, parent_id):
+        pass
+
+    def _fit_node(self, classes, node_id, parent_id):
+        if node_id > 1:
+            mask = create_mask(self.y, classes, other_rate=self.other_rate)
+        else:
+            mask = np.full(self.y.shape, True)
+        y = self.y[mask].copy()
+        old_map = dict(zip(classes, classes))
         model = self._build_model(
             self.units, self.input_shape, (len(classes),)
         )
@@ -85,13 +99,20 @@ class HierarchicalNeuralClassifier:
         epoch = 0
 
         while not stop_flag and epoch < self.max_epochs:
-            y_one_hot = to_one_hot(remap(y, old_map))
+            if len(y) == 0:
+                print(mask)
+                print(self.y)
+                raise ValueError
+            y_one_hot = to_one_hot(
+                remap(y, old_map), categories=[classes])
             num_epochs = self.start if epoch == 0 else self.timeout
             epoch += num_epochs
 
-            model.fit(X, y_one_hot, epochs=num_epochs, verbose=False)
+            model.fit(
+                self.X[mask], y_one_hot, epochs=num_epochs,
+                verbose=False)
             print(f'epoch {epoch}')
-            y_pred = model.predict(X)
+            y_pred = model.predict(self.X[mask])
             class_map = perform_voting(
                 y, y_pred, classes=classes, threshold=self.threshold,
                 threshold_ratio=self.threshold_ratio
@@ -101,10 +122,19 @@ class HierarchicalNeuralClassifier:
 
             old_map = connect_map(old_map, class_map)
 
-        self.models[0] = model
-        print(old_map)
+        self.models[node_id] = model
 
-        return self
+        if not stop_flag:
+            subsets = get_subsets(old_map)
 
-    def fit_node(self, classes, super_class, parent):
+            for super_class, subset in subsets.items():
+
+                if len(subset) > 2:
+                    self._fit_node(subset, node_id + 1, node_id)
+                elif len(subset) == 2:
+                    self._fit_terminal_node(subset, 1, node_id)
+                else:
+                    continue
+
+    def visualize(self):
         pass
