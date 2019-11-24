@@ -3,10 +3,12 @@ import numpy as np
 
 
 def connect_map(old_map: dict, new_map: dict) -> dict:
-
-    return dict(
-        (key, new_map[value]) for key, value in old_map.items()
-    )
+    if len(set(new_map.values())) > 1:
+        return dict(
+            (key, new_map[value]) for key, value in old_map.items()
+        )
+    else:
+        return old_map
 
 
 def get_subsets(a_map: dict) -> dict:
@@ -19,41 +21,46 @@ def get_subsets(a_map: dict) -> dict:
             subsets[value] = [key]
     return subsets
 
+# DETAILED ERRORS
+# УЧЕСТЬ КЛАСС ДРУГОЕ
+
 
 def check_remap(y: np.array, a_map: dict) -> bool:
-    keys = np.unique(list(a_map.keys()))
+    keys = sorted(list((a_map.keys())))
 
     if not np.array_equal(np.unique(y), keys):
-        return False
+        print(keys, np.unique(y))
+        raise KeyError('keys conflict')
     elif not set(list(a_map.values())) <= set(keys):
-        return False
+        print('map values are not subsets of keys')
+        return True
     else:
         return True
+
+# КЛАСС ДРУГОЕ !!!!!!
 
 
 def check_create_mask(y: np.array, classes: list) -> bool:
     if not len(classes) > 1:
-        return False
-    elif not set(classes) < set(y):
+        raise KeyError('Creating mask with one class')
+    elif not set(classes) <= set(y):
         print(classes, set(y))
-        return False
+        raise KeyError('Too many classes for a mask')
     else:
         return True
 
 
 def remap(y: np.array, a_map: dict) -> np.array:
-
-    if not check_remap(y, a_map):
-        raise KeyError
-
-    y = np.vectorize(a_map.get)(y)
-    return y
+    check_remap(y, a_map)
+    return np.vectorize(a_map.get)(y)
 
 
 def to_one_hot(y: np.array, categories='auto') -> np.array:
     encoder = OneHotEncoder(
         categories=categories, sparse=False)
     return encoder.fit_transform(y.reshape(-1, 1))
+
+# КЛАСС ДРУГОЕ
 
 
 def create_mask(
@@ -62,14 +69,5 @@ def create_mask(
 
     if not check_create_mask(y, classes):
         raise KeyError
-
     mask = np.isin(y, np.array(classes))
-    mask1 = np.logical_not(mask)
-
-    size = int(mask1.sum() * other_rate)
-
-    indices = np.random.choice(
-        np.arange(y.shape[0])[mask1], size=size, replace=False,
-    )
-    mask[indices] = True
     return mask
