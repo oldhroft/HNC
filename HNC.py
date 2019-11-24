@@ -1,6 +1,7 @@
 from tensorflow.keras.layers import Dense
 import tensorflow.keras.optimizers as optimizers
 from tensorflow.keras.models import Sequential
+from sklearn.preprocessing import OneHotEncoder
 from anytree import Node
 
 from utils import *
@@ -17,7 +18,7 @@ class HierarchicalNeuralClassifier:
             threshold=.2, threshold_ratio=.5,
             validation_split=None, validation_data=None,
             patience=10, batch_size=32,
-            loss='categorical_crossentropy'):
+            loss='categorical_crossentropy', output_activation='sigmoid'):
 
         self.units = units
         self.activation = activation
@@ -35,6 +36,10 @@ class HierarchicalNeuralClassifier:
         self.loss = loss
         self.max_epochs = max_epochs
         self.other_rate = other_rate
+        self.output_activation = 'sigmoid'
+
+        # специальная метка для класса другое
+        self._OTHER_CLASS_ID = -12992929292292
 
     def _get_optimizer(self):
 
@@ -62,7 +67,7 @@ class HierarchicalNeuralClassifier:
                 activation=self.activation,
                 kernel_regularizer=self.regularization,
             ),
-            Dense(output_shape[0], activation='sigmoid')
+            Dense(output_shape[0], activation=self.output_activation)
         ])
 
         model.compile(
@@ -77,20 +82,39 @@ class HierarchicalNeuralClassifier:
         self.y = y
         self.input_shape = (X.shape[1],)
         self.tree = Node(0)
+        self.node_to_class = {}
+        self.node_counter = 0
         classes = list(np.unique(y))
-        self._fit_node(classes, 1, 0)
-
+        self.node_counter += 1
+        node = Node(self.node_counter, self.tree)
+        self._fit_node(classes, node)
         return self
 
-    def _fit_terminal_node(self, classes, node_id, parent_id):
-        pass
-
-    def _fit_node(self, classes, node_id, parent_id):
-        if node_id > 1:
-            mask = create_mask(self.y, classes, other_rate=self.other_rate)
-        else:
-            mask = np.full(self.y.shape, True)
+    def _fit_terminal_node(self, classes, node):
+        mask = create_mask(
+            self.y, classes, other_rate=self.other_rate)
         y = self.y[mask].copy()
+        encoder = OneHotEncoder(categories='auto', sparse=False)
+        encoder.fit(y.reshape(-1, 1))
+        y = encoder.transform(y.reshape(-1, 1))
+
+        model = self._build_model(
+            self.units, self.input_shape, (len(classes),)
+        )
+        model.fit(self.X[mask], y, epochs=self.max_epochs, verbose=False)
+        self.models[node.name] = model
+
+    def _fit_node(self, classes, node):
+        print(f"Fitting node with classes {classes}")
+        encoder = OneHotEncoder(categories='auto', sparse=False)
+        default_classes = classes.copy()
+
+        # КЛАСС ДРУГОЕ НЕ НАХОДИТСЯ В КЛАССАХ РАЗОБРАТЬСЯ!!!!
+        mask = create_mask(
+            self.y, classes, other_rate=self.other_rate)
+        y = self.y[mask].copy()
+        encoder.fit(y.reshape(-1, 1))
+
         old_map = dict(zip(classes, classes))
         model = self._build_model(
             self.units, self.input_shape, (len(classes),)
@@ -100,11 +124,9 @@ class HierarchicalNeuralClassifier:
 
         while not stop_flag and epoch < self.max_epochs:
             if len(y) == 0:
-                print(mask)
-                print(self.y)
                 raise ValueError
-            y_one_hot = to_one_hot(
-                remap(y, old_map), categories=[classes])
+
+            y_one_hot = encoder.transform(y.reshape(-1, 1))
             num_epochs = self.start if epoch == 0 else self.timeout
             epoch += num_epochs
 
@@ -114,27 +136,39 @@ class HierarchicalNeuralClassifier:
             print(f'epoch {epoch}')
             y_pred = model.predict(self.X[mask])
             class_map = perform_voting(
-                y, y_pred, classes=classes, threshold=self.threshold,
+                y, y_pred, classes=classes, default_classes=default_classes,
+                threshold=self.threshold,
                 threshold_ratio=self.threshold_ratio
             )
             if len(set(class_map.values())) == 2:
                 stop_flag = True
 
             old_map = connect_map(old_map, class_map)
+            print('class_map', class_map)
+            print('old map', old_map)
+            print('unique y before', np.unique(y))
+            y = remap(y, class_map)
+            classes = list(set(y))
+            print('unique y after', classes)
 
-        self.models[node_id] = model
+        self.models[node.name] = model
 
-        if not stop_flag:
-            subsets = get_subsets(old_map)
+        subsets = get_subsets(old_map)
 
-            for super_class, subset in subsets.items():
+        for super_class, subset in subsets.items():
 
-                if len(subset) > 2:
-                    self._fit_node(subset, node_id + 1, node_id)
-                elif len(subset) == 2:
-                    self._fit_terminal_node(subset, 1, node_id)
-                else:
-                    continue
+            if len(subset) > 2:
+                self.node_counter += 1
+                self.node_to_class[self.node_counter] = super_class
+                new_node  = Node(self.node_counter, parent=node)
+                self._fit_node(subset, new_node)
+            elif len(subset) == 2:
+                self.node_counter += 1
+                self.node_to_class[self.node_counter] = super_class
+                new_node = Node(self.node_counter, parent=node)
+                self._fit_terminal_node(subset, new_node)
+            else:
+                continue
 
     def visualize(self):
         pass
