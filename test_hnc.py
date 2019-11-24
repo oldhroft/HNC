@@ -26,8 +26,3 @@ class HNCTester(unittest.TestCase):
 
         model = HierarchicalNeuralClassifier()
         model.fit(X, y)
-
-        self.assertEqual(
-            model.models[1].predict(X).shape,
-            to_one_hot(y).shape
-        )

@@ -1,8 +1,11 @@
+from copy import copy
+
 from tensorflow.keras.layers import Dense
 import tensorflow.keras.optimizers as optimizers
 from tensorflow.keras.models import Sequential
 from sklearn.preprocessing import OneHotEncoder
-from anytree import Node
+from anytree import Node, RenderTree
+from anytree.exporter import DotExporter
 
 from utils import *
 from voter import *
@@ -37,9 +40,6 @@ class HierarchicalNeuralClassifier:
         self.max_epochs = max_epochs
         self.other_rate = other_rate
         self.output_activation = 'sigmoid'
-
-        # специальная метка для класса другое
-        self._OTHER_CLASS_ID = -12992929292292
 
     def _get_optimizer(self):
 
@@ -84,7 +84,7 @@ class HierarchicalNeuralClassifier:
         self.tree = Node(0)
         self.node_to_class = {}
         self.node_counter = 0
-        classes = list(np.unique(y))
+        classes = list(set(y))
         self.node_counter += 1
         node = Node(self.node_counter, self.tree)
         self._fit_node(classes, node)
@@ -109,7 +109,6 @@ class HierarchicalNeuralClassifier:
         encoder = OneHotEncoder(categories='auto', sparse=False)
         default_classes = classes.copy()
 
-        # КЛАСС ДРУГОЕ НЕ НАХОДИТСЯ В КЛАССАХ РАЗОБРАТЬСЯ!!!!
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
         y = self.y[mask].copy()
@@ -124,7 +123,7 @@ class HierarchicalNeuralClassifier:
 
         while not stop_flag and epoch < self.max_epochs:
             if len(y) == 0:
-                raise ValueError
+                raise ValueError('Empty targets')
 
             y_one_hot = encoder.transform(y.reshape(-1, 1))
             num_epochs = self.start if epoch == 0 else self.timeout
@@ -160,7 +159,7 @@ class HierarchicalNeuralClassifier:
             if len(subset) > 2:
                 self.node_counter += 1
                 self.node_to_class[self.node_counter] = super_class
-                new_node  = Node(self.node_counter, parent=node)
+                new_node = Node(self.node_counter, parent=node)
                 self._fit_node(subset, new_node)
             elif len(subset) == 2:
                 self.node_counter += 1
@@ -170,5 +169,9 @@ class HierarchicalNeuralClassifier:
             else:
                 continue
 
-    def visualize(self):
-        pass
+    def visualize(self, how='text', filename='tree.png'):
+        if how == 'text':
+            tree_copy = copy(self.tree)
+            DotExporter(tree_copy).to_picture(filename)
+        else:
+            return str(RenderTree(self.tree))

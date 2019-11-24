@@ -11,7 +11,7 @@ class TestUtils(unittest.TestCase):
                 {0: 3, 1: 2, 2: 1, 3: 1, 4: 2},
                 {3: 2, 1: 2, 2: 2}
             ),
-            {0: 2, 1: 2, 2: 2, 3: 2, 4: 2}
+            {0: 3, 1: 2, 2: 1, 3: 1, 4: 2},
         )
 
         self.assertEqual(
@@ -43,26 +43,6 @@ class TestUtils(unittest.TestCase):
 
         assert np.array_equal(to_one_hot(y, categories), result)
 
-    def test_remap_and_one_hot(self):
-        assert np.array_equal(
-            to_one_hot(remap(
-                [0, 1, 2, 2, 1, 1, 0, 0, 3, 3],
-                {0: 1, 1: 1, 2: 2, 3: 0}
-            )),
-            np.array([
-                [0, 1, 0],  # 1
-                [0, 1, 0],  # 1
-                [0, 0, 1],  # 2
-                [0, 0, 1],  # 2
-                [0, 1, 0],  # 1
-                [0, 1, 0],  # 1
-                [0, 1, 0],  # 1
-                [0, 1, 0],  # 1
-                [1, 0, 0],  # 1
-                [1, 0, 0],  # 1
-            ])
-        )
-
     def test_check_consistency_outer(self):
 
         self.assertRaises(
@@ -73,11 +53,6 @@ class TestUtils(unittest.TestCase):
         self.assertRaises(
             KeyError, remap,
             [0, 1, 1, 1, 1], {0: 1, 2: 30, 3: 3}
-        )
-
-        self.assertRaises(
-            KeyError, remap,
-            [0, 1, 1, 2, 1, ], {0: 1, 1: 3, 2: 1}
         )
 
     def test_create_mask(self):
