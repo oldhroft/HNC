@@ -7,6 +7,8 @@ from sklearn.preprocessing import OneHotEncoder
 from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
 
+from numpy import apply_along_axis
+
 from utils import *
 from voter import *
 
@@ -83,14 +85,16 @@ class HierarchicalNeuralClassifier:
         self.input_shape = (X.shape[1],)
         self.tree = Node(0)
         self.node_to_class = {}
+        self.node_to_classes = {}
+        self.encoders = {}
         self.node_counter = 0
         classes = list(set(y))
-        self.node_counter += 1
-        node = Node(self.node_counter, self.tree)
-        self._fit_node(classes, node)
+        self.node_to_classes[self.node_counter] = classes
+        self._fit_node(classes, self.tree)
         return self
 
     def _fit_terminal_node(self, classes, node):
+        print(f"Fitting terminal node with classes {classes}")
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
         y = self.y[mask].copy()
@@ -98,14 +102,24 @@ class HierarchicalNeuralClassifier:
         encoder.fit(y.reshape(-1, 1))
         y = encoder.transform(y.reshape(-1, 1))
 
+        self.encoders[node.name] = encoder
+
         model = self._build_model(
             self.units, self.input_shape, (len(classes),)
         )
         model.fit(self.X[mask], y, epochs=self.max_epochs, verbose=False)
         self.models[node.name] = model
 
+        for a_class in classes:
+            self.node_counter += 1
+            self.node_to_class[self.node_counter] = a_class
+            new_node = Node(self.node_counter, parent=node)
+            self.node_to_classes[self.node_counter] = [a_class]
+
+
     def _fit_node(self, classes, node):
         print(f"Fitting node with classes {classes}")
+
         encoder = OneHotEncoder(categories='auto', sparse=False)
         default_classes = classes.copy()
 
@@ -113,6 +127,7 @@ class HierarchicalNeuralClassifier:
             self.y, classes, other_rate=self.other_rate)
         y = self.y[mask].copy()
         encoder.fit(y.reshape(-1, 1))
+        self.encoders[node.name] = encoder
 
         old_map = dict(zip(classes, classes))
         model = self._build_model(
@@ -159,15 +174,42 @@ class HierarchicalNeuralClassifier:
             if len(subset) > 2:
                 self.node_counter += 1
                 self.node_to_class[self.node_counter] = super_class
+                self.node_to_classes[self.node_counter] = subset
                 new_node = Node(self.node_counter, parent=node)
                 self._fit_node(subset, new_node)
             elif len(subset) == 2:
                 self.node_counter += 1
                 self.node_to_class[self.node_counter] = super_class
+                self.node_to_classes[self.node_counter] = subset
                 new_node = Node(self.node_counter, parent=node)
                 self._fit_terminal_node(subset, new_node)
             else:
-                continue
+                self.node_counter += 1
+                self.node_to_class[self.node_counter] = super_class
+                new_node = Node(self.node_counter, parent=node)
+                self.node_to_classes[self.node_counter] = subset
+
+    def _predict_node(self, x, node):
+        if node.is_leaf:
+            return self.node_to_class[node.name]
+
+        prediction = self.models[node.name].predict(x.reshape(1, -1))[0]
+        amax = prediction.argmax()
+        prediction = np.zeros_like(prediction)
+        prediction[amax] = 1
+        prediction = self.encoders[node.name].inverse_transform(
+            prediction.reshape(1, -1)
+        )[0]
+        
+        for child in node.children:
+            if prediction in list(self.node_to_classes[child.name]):
+                return self._predict_node(x, child)
+
+        return -1
+
+    def predict(self, X):
+        return apply_along_axis(
+            lambda elem: self._predict_node(elem, self.tree), 1, X).flatten()
 
     def visualize(self, how='text', filename='tree.png'):
         if how == 'text':
