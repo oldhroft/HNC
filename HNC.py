@@ -211,9 +211,6 @@ class HierarchicalNeuralClassifier:
         return apply_along_axis(
             lambda elem: self._predict_node(elem, self.tree), 1, X).flatten()
 
-    def visualize(self, how='text', filename='tree.png'):
-        if how == 'text':
-            tree_copy = copy(self.tree)
-            DotExporter(tree_copy).to_picture(filename)
-        else:
-            return str(RenderTree(self.tree))
+    def visualize(self):
+        return str(RenderTree(self.tree))
+            
