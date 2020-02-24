@@ -40,7 +40,7 @@ batch_size (default=32): размер батча,
 
 loss(default='categorical_crossentropy'): функция потерь, см. https://keras.io/losses/
 
-output_activation(default='sigmoid'): функция потерь выходного слоя
+output_activation(default='sigmoid'): функция активации выходного слоя
 
 ### Методы класса
 
