@@ -1,6 +1,11 @@
 # HNC
 Hierarchical Neural Classifier
 
+**Зависимости - sklearn, tensorflow, anytree**
+
+`pip install anytree`
+
+
 Основной класс - HierarchicalNeuralClassifier
 
 ```python
