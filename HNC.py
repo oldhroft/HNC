@@ -21,8 +21,8 @@ class HierarchicalNeuralClassifier:
             other_rate=.1, regularization=None,
             timeout=10, start=5, max_epochs=20,
             threshold=.2, threshold_ratio=.5,
-            validation_split=None, validation_data=None,
-            patience=10, batch_size=32,
+            validation_split=None,
+            patience=10, batch_size=32, verbose=1,
             loss='categorical_crossentropy', output_activation='sigmoid'):
 
         self.units = units
@@ -35,13 +35,13 @@ class HierarchicalNeuralClassifier:
         self.threshold = threshold
         self.threshold_ratio = threshold_ratio
         self.validation_split = validation_split
-        self.validation_data = validation_data
         self.patience = patience
         self.batch_size = batch_size
         self.loss = loss
         self.max_epochs = max_epochs
         self.other_rate = other_rate
         self.output_activation = 'sigmoid'
+        self.verbose = 1
 
     def _get_optimizer(self):
 
@@ -78,6 +78,11 @@ class HierarchicalNeuralClassifier:
         )
         return model
 
+    def print(self, *args, **kwargs):
+
+        if self.verbose:
+            print(*args, **kwargs)
+
     def fit(self, X, y, verbose=1):
         self.models = {}
         self.X = X
@@ -94,7 +99,8 @@ class HierarchicalNeuralClassifier:
         return self
 
     def _fit_terminal_node(self, classes, node):
-        print(f"Fitting terminal node with classes {classes}")
+        self.print('\n\n', '-' * 50, sep='')
+        self.print(f"Fitting terminal node with classes {classes}")
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
         y = self.y[mask].copy()
@@ -117,7 +123,8 @@ class HierarchicalNeuralClassifier:
             self.node_to_classes[self.node_counter] = [a_class]
 
     def _fit_node(self, classes, node):
-        print(f"Fitting node with classes {classes}")
+        self.print('\n\n', '-' * 50, sep='')
+        self.print(f"Fitting node with classes {classes}")
 
         encoder = OneHotEncoder(categories='auto', sparse=False)
         voter = Voter(classes, strategy=self.threshold,
@@ -148,20 +155,21 @@ class HierarchicalNeuralClassifier:
             model.fit(
                 self.X[mask], y_one_hot, epochs=num_epochs,
                 verbose=False)
-            print(f'epoch {epoch}')
+            self.print(f'epoch {epoch}')
             y_pred = model.predict(self.X[mask])
+
+            self.print(f'Performing voting, epoch {epoch}')
             class_map = voter.vote(y, y_pred, classes)
 
             if len(set(class_map.values())) == 2:
                 stop_flag = True
 
             old_map = connect_map(old_map, class_map)
-            print('class_map', class_map)
-            print('old map', old_map)
-            print('unique y before', np.unique(y))
+            self.print('New mapping', class_map)
+            self.print('Total mapping', old_map)
             y = remap(y, class_map)
-            classes = list(set(y))
-            print('unique y after', classes)
+            classes = sorted(list(set(y)))
+            self.print('{} - > {}'.format(list(np.unique(y)), classes), '\n')
 
         self.models[node.name] = model
 

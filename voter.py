@@ -5,8 +5,6 @@ def perform_voting(
         y_true, y_pred, classes, default_classes,
         threshold, threshold_ratio):
 
-    print(f"perform_voting with classes {classes}")
-
     a_map = {}
 
     mask = y_pred.max(axis=1) > threshold
@@ -57,7 +55,7 @@ class Voter:
             raise NotImplementedError
 
     def vote(self, y_true, y_pred, classes):
-        print('threshold = ', self.threshold)
+        print('Threshold = ', self.threshold)
         return perform_voting(
             y_true, y_pred, classes,
             self.default_classes, self.threshold, self.threshold_ratio)
