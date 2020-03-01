@@ -38,3 +38,26 @@ def perform_voting(
 
     return a_map if len(set(a_map.values())) > 1 else dict(
         zip(classes, classes))
+
+class Voter:
+    def __init__(self, default_classes, model=None,
+                 strategy=.2, threshold_ratio=.5,
+                 track_history=False, dirname='voting'):
+        self.model = model
+        self.default_classes = default_classes
+        self.threshold_ratio = threshold_ratio
+        self.strategy = strategy
+
+    def build_voter(self):
+        if isinstance(self.strategy, float):
+            self.threshold = .2
+        elif self.strategy == 'mean':
+            self.threshold = 1 / len(self.default_classes)
+        else:
+            raise NotImplementedError
+
+    def vote(self, y_true, y_pred, classes):
+        print('threshold = ', self.threshold)
+        return perform_voting(
+            y_true, y_pred, classes,
+            self.default_classes, self.threshold, self.threshold_ratio)

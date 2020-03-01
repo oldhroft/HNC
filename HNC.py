@@ -113,15 +113,16 @@ class HierarchicalNeuralClassifier:
         for a_class in classes:
             self.node_counter += 1
             self.node_to_class[self.node_counter] = a_class
-            new_node = Node(self.node_counter, parent=node)
+            Node(self.node_counter, parent=node)
             self.node_to_classes[self.node_counter] = [a_class]
-
 
     def _fit_node(self, classes, node):
         print(f"Fitting node with classes {classes}")
 
         encoder = OneHotEncoder(categories='auto', sparse=False)
-        default_classes = classes.copy()
+        voter = Voter(classes, strategy=self.threshold,
+                      threshold_ratio=self.threshold_ratio)
+        voter.build_voter()
 
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
@@ -149,11 +150,8 @@ class HierarchicalNeuralClassifier:
                 verbose=False)
             print(f'epoch {epoch}')
             y_pred = model.predict(self.X[mask])
-            class_map = perform_voting(
-                y, y_pred, classes=classes, default_classes=default_classes,
-                threshold=self.threshold,
-                threshold_ratio=self.threshold_ratio
-            )
+            class_map = voter.vote(y, y_pred, classes)
+
             if len(set(class_map.values())) == 2:
                 stop_flag = True
 
@@ -200,7 +198,7 @@ class HierarchicalNeuralClassifier:
         prediction = self.encoders[node.name].inverse_transform(
             prediction.reshape(1, -1)
         )[0]
-        
+
         for child in node.children:
             if prediction in list(self.node_to_classes[child.name]):
                 return self._predict_node(x, child)
@@ -213,4 +211,3 @@ class HierarchicalNeuralClassifier:
 
     def visualize(self):
         return str(RenderTree(self.tree))
-            
