@@ -1,4 +1,7 @@
 import numpy as np
+from tensorflow.keras.models import clone_model
+
+from utils import reset_weights
 
 
 def perform_voting(
@@ -37,20 +40,39 @@ def perform_voting(
     return a_map if len(set(a_map.values())) > 1 else dict(
         zip(classes, classes))
 
+
 class Voter:
-    def __init__(self, default_classes, model=None,
+
+    def __init__(self, default_classes,
                  strategy=.2, threshold_ratio=.5,
-                 track_history=False, dirname='voting'):
-        self.model = model
+                 track_history=False, dirname='voting',
+                 n_inits=5):
         self.default_classes = default_classes
         self.threshold_ratio = threshold_ratio
         self.strategy = strategy
+        self.n_inits = n_inits
 
-    def build_voter(self):
+    def build_voter(self, X=None, model=None):
         if isinstance(self.strategy, float):
             self.threshold = .2
         elif self.strategy == 'mean':
             self.threshold = 1 / len(self.default_classes)
+        elif self.strategy == 'std':
+            model = clone_model(model)
+            if X is None:
+                raise ValueError(
+                    'X should be specified when strategy = "std"')
+            threshold = 1 / len(self.default_classes)
+            total_std = 0
+            for init in range(self.n_inits):
+                reset_weights(model)
+                total_std += model.predict(X).std()
+            threshold += total_std / self.n_inits
+            self.threshold = threshold
+        elif self.strategy == 'compromise':
+            K = len(self.default_classes)
+            total = sum(1 / i for i in range(3, K + 1))
+            self.threshold = total / K
         else:
             raise NotImplementedError
 

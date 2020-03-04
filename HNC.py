@@ -23,7 +23,8 @@ class HierarchicalNeuralClassifier:
             threshold=.2, threshold_ratio=.5,
             validation_split=None,
             patience=10, batch_size=32, verbose=1,
-            loss='categorical_crossentropy', output_activation='sigmoid'):
+            loss='categorical_crossentropy', 
+            output_activation='sigmoid'):
 
         self.units = units
         self.activation = activation
@@ -111,8 +112,7 @@ class HierarchicalNeuralClassifier:
         self.encoders[node.name] = encoder
 
         model = self._build_model(
-            self.units, self.input_shape, (len(classes),)
-        )
+            self.units, self.input_shape, (len(classes),))
         model.fit(self.X[mask], y, epochs=self.max_epochs, verbose=False)
         self.models[node.name] = model
 
@@ -129,7 +129,6 @@ class HierarchicalNeuralClassifier:
         encoder = OneHotEncoder(categories='auto', sparse=False)
         voter = Voter(classes, strategy=self.threshold,
                       threshold_ratio=self.threshold_ratio)
-        voter.build_voter()
 
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
@@ -139,8 +138,8 @@ class HierarchicalNeuralClassifier:
 
         old_map = dict(zip(classes, classes))
         model = self._build_model(
-            self.units, self.input_shape, (len(classes),)
-        )
+            self.units, self.input_shape, (len(classes),))
+        voter.build_voter(self.X[mask], model)
         stop_flag = False
         epoch = 0
 
@@ -215,7 +214,8 @@ class HierarchicalNeuralClassifier:
 
     def predict(self, X):
         return apply_along_axis(
-            lambda elem: self._predict_node(elem, self.tree), 1, X).flatten()
+            lambda elem: self._predict_node(elem, self.tree),
+            1, X).flatten()
 
     def visualize(self):
         return str(RenderTree(self.tree))

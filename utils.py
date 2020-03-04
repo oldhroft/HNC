@@ -1,6 +1,8 @@
 from sklearn.preprocessing import OneHotEncoder
 import numpy as np
 
+import tensorflow.keras.backend as K
+
 
 def connect_map(old_map: dict, new_map: dict) -> dict:
     if len(set(new_map.values())) > 1:
@@ -21,10 +23,6 @@ def get_subsets(a_map: dict) -> dict:
             subsets[value] = [key]
     return subsets
 
-# DETAILED ERRORS
-# УЧЕСТЬ КЛАСС ДРУГОЕ
-
-
 def check_remap(y: np.array, a_map: dict) -> bool:
     keys = sorted(list((a_map.keys())))
 
@@ -36,9 +34,6 @@ def check_remap(y: np.array, a_map: dict) -> bool:
         return True
     else:
         return True
-
-# КЛАСС ДРУГОЕ !!!!!!
-
 
 def check_create_mask(y: np.array, classes: list) -> bool:
     if not len(classes) > 1:
@@ -60,9 +55,6 @@ def to_one_hot(y: np.array, categories='auto') -> np.array:
         categories=categories, sparse=False)
     return encoder.fit_transform(y.reshape(-1, 1))
 
-# КЛАСС ДРУГОЕ
-
-
 def create_mask(
         y: np.array, classes: list,
         other_rate: float) -> np.array:
@@ -71,3 +63,12 @@ def create_mask(
         raise KeyError
     mask = np.isin(y, np.array(classes))
     return mask
+
+
+def reset_weights(model):
+    session = K.get_session()
+    for layer in model.layers:
+        if hasattr(layer, 'kernel_initializer'):
+            layer.kernel.initializer.run(session=session)
+        if hasattr(layer, 'bias_initializer'):
+            layer.bias.initializer.run(session=session)
