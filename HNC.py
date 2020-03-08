@@ -21,6 +21,7 @@ class HierarchicalNeuralClassifier:
             optimizer='sgd', optimizer_params={},
             other_rate=.1, regularization=None,
             timeout=10, start=5, max_epochs=20,
+            end_fit=10,
             threshold=.2, threshold_ratio=.5,
             validation_split=None,
             patience=10, batch_size=32, verbose=1,
@@ -45,6 +46,7 @@ class HierarchicalNeuralClassifier:
         self.output_activation = output_activation
         self.verbose = verbose
         self.backbone = backbone
+        self.end_fit = end_fit
 
     def _get_optimizer(self):
 
@@ -190,10 +192,14 @@ class HierarchicalNeuralClassifier:
             old_map = connect_map(old_map, class_map)
             self.print('New mapping', class_map)
             self.print('Total mapping', old_map)
+            old_classes = list(np.unique(y))
             y = remap(y, class_map)
             classes = sorted(list(set(y)))
-            self.print('{} - > {}'.format(list(np.unique(y)), classes), '\n')
+            self.print('{} - > {}'.format(old_classes, classes), '\n')
 
+        y_one_hot = encoder.transform(y.reshape(-1, 1))
+        self.print('Performing end fit')
+        model.fit(self.X[mask], y_one_hot, epochs=self.end_fit)
         self.models[node.name] = model
 
         subsets = get_subsets(old_map)
