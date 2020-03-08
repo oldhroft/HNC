@@ -43,7 +43,7 @@ class HierarchicalNeuralClassifier:
         self.max_epochs = max_epochs
         self.other_rate = other_rate
         self.output_activation = output_activation
-        self.verbose = 1
+        self.verbose = verbose
         self.backbone = backbone
 
     def _get_optimizer(self):
