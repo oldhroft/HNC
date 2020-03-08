@@ -1,17 +1,15 @@
-from copy import copy
-
 from tensorflow.keras.layers import Dense
 import tensorflow.keras.optimizers as optimizers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import clone_model
 from sklearn.preprocessing import OneHotEncoder
 from anytree import Node
-from visualization import visualize_tree
 
 from numpy import concatenate
 
 from utils import *
 from voter import *
+from visualization import visualize_tree
 
 
 class HierarchicalNeuralClassifier:
@@ -65,7 +63,7 @@ class HierarchicalNeuralClassifier:
         elif self.optimizer == 'rmsprop':
             return optimizer.RMSprop(**self.optimizer_params)
         else:
-            raise NotImplementedError
+            raise ValueError(f'No optimizer named {self.optimizer}')
 
     def _build_model(self, units, output_shape,
                      input_shape=None, backbone=None):
@@ -135,7 +133,7 @@ class HierarchicalNeuralClassifier:
             self.units, (len(classes),), self.input_shape,
             clone_model(self.backbone)
             if self.backbone is not None else None)
-        model.fit(self.X[mask], y, epochs=self.max_epochs,
+        model.fit(self.X[mask], y, epochs=self.end_fit,
                   verbose=self.verbose > 1, batch_size=self.batch_size)
         self.models[node.name] = model
 
@@ -191,7 +189,7 @@ class HierarchicalNeuralClassifier:
             old_map = connect_map(old_map, class_map)
             self.print('New mapping', class_map)
             self.print('Total mapping', old_map)
-            old_classes = list(np.unique(y))
+            old_classes = sorted(list(set(y)))
             y = remap(y, class_map)
             classes = sorted(list(set(y)))
             self.print('{} - > {}'.format(old_classes, classes), '\n')
@@ -199,30 +197,23 @@ class HierarchicalNeuralClassifier:
         y_one_hot = encoder.transform(y.reshape(-1, 1))
         self.print('Performing end fit')
         model.fit(self.X[mask], y_one_hot, epochs=self.end_fit,
-                  batch_size=self.batch_size)
+                  batch_size=self.batch_size, verbose=self.verbose > 1)
         self.models[node.name] = model
 
         subsets = get_subsets(old_map)
 
         for super_class, subset in subsets.items():
 
+            self.node_counter += 1
+            self.node_to_class[self.node_counter] = super_class
+            self.node_to_classes[self.node_counter] = subset
+            new_node = Node(self.node_counter, parent=node)
             if len(subset) > 2:
-                self.node_counter += 1
-                self.node_to_class[self.node_counter] = super_class
-                self.node_to_classes[self.node_counter] = subset
-                new_node = Node(self.node_counter, parent=node)
                 self._fit_node(subset, new_node)
             elif len(subset) == 2:
-                self.node_counter += 1
-                self.node_to_class[self.node_counter] = super_class
-                self.node_to_classes[self.node_counter] = subset
-                new_node = Node(self.node_counter, parent=node)
                 self._fit_terminal_node(subset, new_node)
             else:
-                self.node_counter += 1
-                self.node_to_class[self.node_counter] = super_class
-                new_node = Node(self.node_counter, parent=node)
-                self.node_to_classes[self.node_counter] = subset
+                pass
 
     def _predict_node(self, x, node):
         if node.is_leaf:

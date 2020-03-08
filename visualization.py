@@ -30,4 +30,4 @@ def visualize_tree(tree, mode, node_to_class, node_to_classes):
             ])
         return string
     else:
-        raise NotImplementedError
+        raise ValueError(f'No mode named {mode}')
