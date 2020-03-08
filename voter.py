@@ -54,7 +54,7 @@ class Voter:
 
     def build_voter(self, X=None, model=None):
         if isinstance(self.strategy, float):
-            self.threshold = .2
+            self.threshold = self.strategy
         elif self.strategy == 'mean':
             self.threshold = 1 / len(self.default_classes)
         elif self.strategy == 'std':

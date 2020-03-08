@@ -3,6 +3,7 @@ from copy import copy
 from tensorflow.keras.layers import Dense
 import tensorflow.keras.optimizers as optimizers
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import clone_model
 from sklearn.preprocessing import OneHotEncoder
 from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
@@ -23,8 +24,8 @@ class HierarchicalNeuralClassifier:
             threshold=.2, threshold_ratio=.5,
             validation_split=None,
             patience=10, batch_size=32, verbose=1,
-            loss='categorical_crossentropy', 
-            output_activation='sigmoid'):
+            loss='categorical_crossentropy',
+            output_activation='sigmoid', backbone=None):
 
         self.units = units
         self.activation = activation
@@ -41,8 +42,9 @@ class HierarchicalNeuralClassifier:
         self.loss = loss
         self.max_epochs = max_epochs
         self.other_rate = other_rate
-        self.output_activation = 'sigmoid'
+        self.output_activation = output_activation
         self.verbose = 1
+        self.backbone = backbone
 
     def _get_optimizer(self):
 
@@ -63,15 +65,32 @@ class HierarchicalNeuralClassifier:
         else:
             raise NotImplementedError
 
-    def _build_model(self, units, input_shape, output_shape):
-        model = Sequential([
-            Dense(
-                units, input_shape=input_shape,
-                activation=self.activation,
-                kernel_regularizer=self.regularization,
-            ),
-            Dense(output_shape[0], activation=self.output_activation)
-        ])
+    def _build_model(self, units, output_shape,
+                     input_shape=None, backbone=None):
+
+        if input_shape is None and backbone is None:
+            raise ValueError(
+                'Either backbone or input_shape should be specified')
+
+        if backbone is None:
+            model = Sequential([
+                Dense(
+                    units, input_shape=input_shape,
+                    activation=self.activation,
+                    kernel_regularizer=self.regularization,
+                ),
+                Dense(output_shape[0], activation=self.output_activation)
+            ])
+
+        else:
+            model = Sequential([
+                backbone,
+                Dense(
+                    units, activation=self.activation,
+                    kernel_regularizer=self.regularization,
+                ),
+                Dense(output_shape[0], activation=self.output_activation)
+            ])
 
         model.compile(
             loss=self.loss,
@@ -112,8 +131,11 @@ class HierarchicalNeuralClassifier:
         self.encoders[node.name] = encoder
 
         model = self._build_model(
-            self.units, self.input_shape, (len(classes),))
-        model.fit(self.X[mask], y, epochs=self.max_epochs, verbose=False)
+            self.units, (len(classes),), self.input_shape,
+            clone_model(self.backbone)
+            if self.backbone is not None else None)
+        model.fit(self.X[mask], y, epochs=self.max_epochs,
+                  verbose=self.verbose > 1)
         self.models[node.name] = model
 
         for a_class in classes:
@@ -138,7 +160,9 @@ class HierarchicalNeuralClassifier:
 
         old_map = dict(zip(classes, classes))
         model = self._build_model(
-            self.units, self.input_shape, (len(classes),))
+            self.units, (len(classes),), self.input_shape,
+            clone_model(self.backbone)
+            if self.backbone is not None else None)
         voter.build_voter(self.X[mask], model)
         stop_flag = False
         epoch = 0
@@ -153,7 +177,7 @@ class HierarchicalNeuralClassifier:
 
             model.fit(
                 self.X[mask], y_one_hot, epochs=num_epochs,
-                verbose=False)
+                verbose=self.verbose > 1)
             self.print(f'epoch {epoch}')
             y_pred = model.predict(self.X[mask])
 
