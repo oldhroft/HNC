@@ -137,7 +137,7 @@ class HierarchicalNeuralClassifier:
             clone_model(self.backbone)
             if self.backbone is not None else None)
         model.fit(self.X[mask], y, epochs=self.max_epochs,
-                  verbose=self.verbose > 1)
+                  verbose=self.verbose > 1, batch_size=self.batch_size)
         self.models[node.name] = model
 
         for a_class in classes:
@@ -179,7 +179,7 @@ class HierarchicalNeuralClassifier:
 
             model.fit(
                 self.X[mask], y_one_hot, epochs=num_epochs,
-                verbose=self.verbose > 1)
+                verbose=self.verbose > 1, batch_size=self.batch_size)
             self.print(f'epoch {epoch}')
             y_pred = model.predict(self.X[mask])
 
@@ -199,7 +199,7 @@ class HierarchicalNeuralClassifier:
 
         y_one_hot = encoder.transform(y.reshape(-1, 1))
         self.print('Performing end fit')
-        model.fit(self.X[mask], y_one_hot, epochs=self.end_fit)
+        model.fit(self.X[mask], y_one_hot, epochs=self.end_fit, batch_size=self.batch_size)
         self.models[node.name] = model
 
         subsets = get_subsets(old_map)
