@@ -8,7 +8,7 @@ from sklearn.preprocessing import OneHotEncoder
 from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
 
-from numpy import apply_along_axis
+from numpy import concatenate
 
 from utils import *
 from voter import *
@@ -226,26 +226,26 @@ class HierarchicalNeuralClassifier:
 
     def _predict_node(self, x, node):
         if node.is_leaf:
-            return self.node_to_class[node.name]
+            return np.ones(len(x)) * self.node_to_class[node.name]
+        else:
 
-        prediction = self.models[node.name].predict(x.reshape(1, -1))[0]
-        amax = prediction.argmax()
-        prediction = np.zeros_like(prediction)
-        prediction[amax] = 1
-        prediction = self.encoders[node.name].inverse_transform(
-            prediction.reshape(1, -1)
-        )[0]
-
-        for child in node.children:
-            if prediction in list(self.node_to_classes[child.name]):
-                return self._predict_node(x, child)
-
-        return -1
+            preds = self.models[node.name].predict(x)
+            preds = (preds == preds.max(axis=1, keepdims=1)).astype('int')
+            preds = self.encoders[node.name].inverse_transform(preds).ravel()
+            ids = np.arange(len(preds))
+            stack = []
+            ids_stack = []
+            for child in node.children:
+                mask = np.isin(preds, self.node_to_classes[child.name])
+                if mask.sum() > 0:
+                    ids_stack.append(ids[mask])
+                    stack.append(self._predict_node(x[mask], child))
+            ids = concatenate(ids_stack).argsort()
+            preds = concatenate(stack)
+            return preds[ids]
 
     def predict(self, X):
-        return apply_along_axis(
-            lambda elem: self._predict_node(elem, self.tree),
-            1, X).flatten()
+        return self._predict_node(X, self.tree)
 
     def visualize(self):
         return str(RenderTree(self.tree))
