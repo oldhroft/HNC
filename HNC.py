@@ -5,8 +5,8 @@ import tensorflow.keras.optimizers as optimizers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import clone_model
 from sklearn.preprocessing import OneHotEncoder
-from anytree import Node, RenderTree
-from anytree.exporter import DotExporter
+from anytree import Node
+from visualization import visualize_tree
 
 from numpy import concatenate
 
@@ -101,7 +101,6 @@ class HierarchicalNeuralClassifier:
         return model
 
     def print(self, *args, **kwargs):
-
         if self.verbose:
             print(*args, **kwargs)
 
@@ -199,7 +198,8 @@ class HierarchicalNeuralClassifier:
 
         y_one_hot = encoder.transform(y.reshape(-1, 1))
         self.print('Performing end fit')
-        model.fit(self.X[mask], y_one_hot, epochs=self.end_fit, batch_size=self.batch_size)
+        model.fit(self.X[mask], y_one_hot, epochs=self.end_fit,
+                  batch_size=self.batch_size)
         self.models[node.name] = model
 
         subsets = get_subsets(old_map)
@@ -247,5 +247,6 @@ class HierarchicalNeuralClassifier:
     def predict(self, X):
         return self._predict_node(X, self.tree)
 
-    def visualize(self):
-        return str(RenderTree(self.tree))
+    def visualize(self, mode='classes'):
+        return visualize_tree(self.tree, mode, self.node_to_class,
+                              self.node_to_classes)
