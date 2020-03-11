@@ -13,7 +13,6 @@ def perform_voting(
     mask = y_pred.max(axis=1) > threshold
     mapper_dict = np.vectorize(
         dict(zip(range(len(default_classes)), default_classes)).get)
-    print('default_classes', default_classes)
     y_pred = mapper_dict(y_pred.argmax(axis=1))
     for a_class in classes:
         class_mask = y_true == a_class
@@ -46,11 +45,12 @@ class Voter:
     def __init__(self, default_classes,
                  strategy=.2, threshold_ratio=.5,
                  track_history=False, dirname='voting',
-                 n_inits=5):
+                 n_inits=5, total_classes=None):
         self.default_classes = default_classes
         self.threshold_ratio = threshold_ratio
         self.strategy = strategy
         self.n_inits = n_inits
+        self.total_classes = total_classes
 
     def build_voter(self, X=None, model=None):
         if isinstance(self.strategy, float):
@@ -70,14 +70,12 @@ class Voter:
             threshold += total_std / self.n_inits
             self.threshold = threshold
         elif self.strategy == 'compromise':
-            K = len(self.default_classes)
-            total = sum(1 / i for i in range(3, K + 1))
-            self.threshold = total / K
+            total = sum(1 / i for i in range(3, self.total_classes + 1))
+            self.threshold = total / self.total_classes
         else:
             raise NotImplementedError
 
     def vote(self, y_true, y_pred, classes):
-        print('Threshold = ', self.threshold)
         return perform_voting(
             y_true, y_pred, classes,
             self.default_classes, self.threshold, self.threshold_ratio)

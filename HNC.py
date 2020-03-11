@@ -113,6 +113,7 @@ class HierarchicalNeuralClassifier:
         self.encoders = {}
         self.node_counter = 0
         classes = list(set(y))
+        self._K = len(classes)
         self.node_to_classes[self.node_counter] = classes
         self._fit_node(classes, self.tree)
         return self
@@ -162,7 +163,7 @@ class HierarchicalNeuralClassifier:
             self.units, (len(classes),), self.input_shape,
             clone_model(self.backbone)
             if self.backbone is not None else None)
-        voter.build_voter(self.X[mask], model)
+        voter.build_voter(self.X[mask], model, self._K)
         stop_flag = False
         epoch = 0
 
