@@ -116,6 +116,7 @@ class HierarchicalNeuralClassifier:
         self._K = len(classes)
         self.node_to_classes[self.node_counter] = classes
         self._fit_node(classes, self.tree)
+        del self.X
         return self
 
     def _fit_terminal_node(self, classes, node):
@@ -150,7 +151,8 @@ class HierarchicalNeuralClassifier:
 
         encoder = OneHotEncoder(categories='auto', sparse=False)
         voter = Voter(classes, strategy=self.threshold,
-                      threshold_ratio=self.threshold_ratio)
+                      threshold_ratio=self.threshold_ratio,
+                      total_classes=self._K)
 
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
@@ -163,7 +165,7 @@ class HierarchicalNeuralClassifier:
             self.units, (len(classes),), self.input_shape,
             clone_model(self.backbone)
             if self.backbone is not None else None)
-        voter.build_voter(self.X[mask], model, self._K)
+        voter.build_voter(self.X[mask], model)
         stop_flag = False
         epoch = 0
 
@@ -215,6 +217,24 @@ class HierarchicalNeuralClassifier:
                 self._fit_terminal_node(subset, new_node)
             else:
                 pass
+
+    def refit(self, X, y, backbone, units=2, epochs=10):
+        self.backbone = backbone
+        self.units = units
+        for node_id in self.models:
+            encoder = self.encoders[node_id]
+            classes = self.node_to_classes[node_id]
+            model = self._build_model(
+                self.units, (len(classes),),
+                self.input_shape, backbone=clone_model(backbone))
+            mask = np.isin(y, classes)
+            super_class = 'root' if node_id == 0 else self.node_to_classes[node_id]
+            self.print(f'Refitting model at node {super_class}:{classes}')
+            model.fit(
+                X[mask], encoder.transform(y[mask].reshape(-1, 1)),
+                epochs=epochs, verbose=self.verbose > 1)
+
+        return self
 
     def _predict_node(self, x, node):
         if node.is_leaf:
