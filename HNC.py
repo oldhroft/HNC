@@ -110,6 +110,7 @@ class HierarchicalNeuralClassifier:
         self.tree = Node(0)
         self.node_to_class = {}
         self.node_to_classes = {}
+        self.class_maps = {}
         self.encoders = {}
         self.node_counter = 0
         classes = list(set(y))
@@ -130,6 +131,7 @@ class HierarchicalNeuralClassifier:
         y = encoder.transform(y.reshape(-1, 1))
 
         self.encoders[node.name] = encoder
+        self.class_maps[node.name] = dict(zip(classes, classes))
 
         model = self._build_model(
             self.units, (len(classes),), self.input_shape,
@@ -188,7 +190,7 @@ class HierarchicalNeuralClassifier:
 
             if len(set(class_map.values())) == 2:
                 stop_flag = True
-
+                
             old_map = connect_map(old_map, class_map)
             self.print('New mapping', class_map)
             self.print('Total mapping', old_map)
@@ -202,6 +204,7 @@ class HierarchicalNeuralClassifier:
         model.fit(self.X[mask], y_one_hot, epochs=self.end_fit,
                   batch_size=self.batch_size, verbose=self.verbose > 1)
         self.models[node.name] = model
+        self.class_maps[node.name] = old_map
 
         subsets = get_subsets(old_map)
 
@@ -224,15 +227,18 @@ class HierarchicalNeuralClassifier:
         for node_id in self.models:
             encoder = self.encoders[node_id]
             classes = self.node_to_classes[node_id]
+            class_map = self.class_maps[node_id]
             model = self._build_model(
                 self.units, (len(classes),),
                 self.input_shape, backbone=clone_model(backbone))
             mask = np.isin(y, classes)
-            super_class = 'root' if node_id == 0 else self.node_to_classes[node_id]
+            super_class = 'root' if node_id == 0 else self.node_to_class[node_id]
             self.print(f'Refitting model at node {super_class}:{classes}')
             model.fit(
-                X[mask], encoder.transform(y[mask].reshape(-1, 1)),
+                X[mask], encoder.transform(
+                    remap(y[mask], class_map).reshape(-1, 1)),
                 epochs=epochs, verbose=self.verbose > 1)
+            self.models[node_id] = model
 
         return self
 
