@@ -5,7 +5,7 @@ from tensorflow.keras.models import clone_model
 from sklearn.preprocessing import OneHotEncoder
 from anytree import Node
 
-from numpy import concatenate
+from numpy import concatenate, __version__
 
 from utils import *
 from voter import *
@@ -220,7 +220,6 @@ class HierarchicalNeuralClassifier:
         if node.is_leaf:
             return np.ones(len(x)) * self.node_to_class[node.name]
         else:
-
             preds = self.models[node.name].predict(x)
             preds = (preds == preds.max(axis=1, keepdims=1)).astype('int')
             preds = self.encoders[node.name].inverse_transform(preds).ravel()
@@ -238,6 +237,23 @@ class HierarchicalNeuralClassifier:
 
     def predict(self, X):
         return self._predict_node(X, self.tree)
+
+    def refit(self, X, y, backbone, epochs, batch_size=32, units=None):
+        if units is None:
+            units = self.units
+        for node_id in self.models:
+            classes = self.node_to_classes[node_id]
+            self.print(f'Refitting node {node_id} with classes = {classes}')
+            output_shape = (len(classes),)
+            model = self._build_model(units, output_shape, backbone=backbone)
+            mask = np.isin(y, classes)
+            y_i = self.encoders[node_id].transform(y[mask].reshape(-1, 1))
+            model.fit(X[mask], y_i, epochs=epochs,
+                                     batch_size=batch_size,
+                                     verbose=self.verbose > 1)
+            self.models[node_id] = model
+        return self
+
 
     def visualize(self, mode='classes'):
         return visualize_tree(self.tree, mode, self.node_to_class,

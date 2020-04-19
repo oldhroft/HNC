@@ -52,7 +52,7 @@ class Voter:
         self.n_inits = n_inits
         self.total_classes = total_classes
 
-    def build_voter(self, X=None, model=None):
+    def build_voter(self, X=None, model=None, K=None):
         if isinstance(self.strategy, float):
             self.threshold = self.strategy
         elif self.strategy == 'mean':
@@ -70,8 +70,8 @@ class Voter:
             threshold += total_std / self.n_inits
             self.threshold = threshold
         elif self.strategy == 'compromise':
-            total = sum(1 / i for i in range(3, self.total_classes + 1))
-            self.threshold = total / self.total_classes
+            total = sum(1 / i for i in range(3, K + 1))
+            self.threshold = total / K
         else:
             raise NotImplementedError
 
