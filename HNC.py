@@ -5,12 +5,15 @@ from tensorflow.keras.models import clone_model
 from sklearn.preprocessing import OneHotEncoder
 from anytree import Node
 
-from numpy import concatenate
+from numpy import concatenate, savetxt
 
 from utils import *
 from voter import *
 from visualization import visualize_tree
 
+from os import mkdir
+from os.path import join
+from json import dump
 
 class HierarchicalNeuralClassifier:
 
@@ -24,7 +27,7 @@ class HierarchicalNeuralClassifier:
             validation_split=None,
             patience=10, batch_size=32, verbose=1,
             loss='categorical_crossentropy',
-            output_activation='sigmoid', backbone=None):
+            output_activation='sigmoid', backbone=None,):
 
         self.units = units
         self.activation = activation
@@ -102,7 +105,7 @@ class HierarchicalNeuralClassifier:
         if self.verbose:
             print(*args, **kwargs)
 
-    def fit(self, X, y, verbose=1):
+    def fit(self, X, y, verbose=1, log_output_folder=None):
         self.models = {}
         self.X = X
         self.y = y
@@ -115,14 +118,39 @@ class HierarchicalNeuralClassifier:
         self.node_counter = 0
         classes = list(set(y))
         self._K = len(classes)
+        self.log_output_folder = log_output_folder
+
+        if self.log_output_folder is not None:
+            self.log_output = True
+            mkdir(self.log_output_folder)
+
         self.node_to_classes[self.node_counter] = classes
+        self.node_to_class[self.node_counter] = 'root'
         self._fit_node(classes, self.tree)
-        del self.X
+
+
+        del self.X, self.log_output_folder
         return self
 
     def _fit_terminal_node(self, classes, node):
         self.print('\n\n', '-' * 50, sep='')
         self.print(f"Fitting terminal node with classes {classes}")
+        if self.log_output:
+
+            current_folder = join(self.log_output_folder,
+                                  '/'.join(str(n.name) for n in node.path))
+            mkdir(current_folder)
+            with open(join(current_folder, f'node{node.name}.json'), 
+                      'w', encoding='utf-8') as node_info_file:
+                node_info = {
+                    'name': str(node.name),
+                    'class_name': str(self.node_to_class[node.name]),
+                    'parent': 'nan' if node.is_root else str(node.parent.name),
+                    'classes': str(classes),
+                    'fullpath':  str(node),
+                }
+                dump(node_info, node_info_file)
+
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
         y = self.y[mask].copy()
@@ -150,6 +178,23 @@ class HierarchicalNeuralClassifier:
     def _fit_node(self, classes, node):
         self.print('\n\n', '-' * 50, sep='')
         self.print(f"Fitting node with classes {classes}")
+
+        if self.log_output:
+
+            current_folder = join(self.log_output_folder,
+                                  '/'.join(str(n.name) for n in node.path))
+            mkdir(current_folder)
+            with open(join(current_folder, f'node{node.name}.json'),
+                      'w', encoding='utf-8') as node_info_file:
+                node_info = {
+                    'name': str(node.name),
+                    'class_name': str(self.node_to_class[node.name]),
+                    'parent': 'nan' if node.is_root else str(node.parent.name),
+                    'classes': str(classes),
+                    'fullpath':  str(node),
+                }
+                dump(node_info, node_info_file)
+
 
         encoder = OneHotEncoder(categories='auto', sparse=False)
         voter = Voter(classes, strategy=self.threshold,
@@ -184,6 +229,10 @@ class HierarchicalNeuralClassifier:
                 verbose=self.verbose > 1, batch_size=self.batch_size)
             self.print(f'epoch {epoch}')
             y_pred = model.predict(self.X[mask])
+
+            if self.log_output:
+                fname = join(current_folder, f'predictions_epoch{epoch}.csv')
+                savetxt(fname, y_pred, delimiter=',')
 
             self.print(f'Performing voting, epoch {epoch}')
             class_map = voter.vote(y, y_pred, classes)
