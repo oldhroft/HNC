@@ -4,16 +4,20 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import clone_model
 from sklearn.preprocessing import OneHotEncoder
 from anytree import Node
+from anytree.exporter import DictExporter
 
-from numpy import concatenate, savetxt
+from numpy import concatenate, savetxt, arange
 
 from utils import *
 from voter import *
-from visualization import visualize_tree
+from visualization import visualize_tree, get_activation_history_from_folder
 
 from os import mkdir
 from os.path import join
 from json import dump
+from yaml import dump as yaml_dump
+
+from anytree.search import find
 
 class HierarchicalNeuralClassifier:
 
@@ -123,13 +127,17 @@ class HierarchicalNeuralClassifier:
         if self.log_output_folder is not None:
             self.log_output = True
             mkdir(self.log_output_folder)
+        else:
+            self.log_output = False
 
         self.node_to_classes[self.node_counter] = classes
         self.node_to_class[self.node_counter] = 'root'
         self._fit_node(classes, self.tree)
 
+        if self.log_output:
+            self.to_yaml(join(self.log_output_folder, '0', 'tree.yaml'))
 
-        del self.X, self.log_output_folder
+        del self.X
         return self
 
     def _fit_terminal_node(self, classes, node):
@@ -203,6 +211,7 @@ class HierarchicalNeuralClassifier:
 
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
+        print(f'Example rate {mask.sum() / mask.shape[0]}')
         y = self.y[mask].copy()
         encoder.fit(y.reshape(-1, 1))
         self.encoders[node.name] = encoder
@@ -212,9 +221,24 @@ class HierarchicalNeuralClassifier:
             self.units, (len(classes),), self.input_shape,
             clone_model(self.backbone)
             if self.backbone is not None else None)
-        voter.build_voter(self.X[mask], model)
+        self.models[node.name] = model
+        voter.build_voter(self.X[mask], self.models[node.name])
         stop_flag = False
         epoch = 0
+
+        if self.log_output:
+            y_pred = self.models[node.name].predict(self.X[mask])
+            fname = join(current_folder, 
+                         f'predictions_epoch{format_number(epoch)}.csv')
+            indices_fname = join(current_folder, 'indices.csv')
+            classes_fname = join(current_folder,
+                                 f'labels{format_number(epoch)}.csv')
+            indices = arange(self.X.shape[0], dtype='int64')[mask].reshape(-1, 1)
+
+            savetxt(fname, y_pred, delimiter=',')
+            savetxt(indices_fname, indices, delimiter=',')
+            savetxt(classes_fname, y.astype('int64'), delimiter=',')
+
 
         while not stop_flag and epoch < self.max_epochs:
             if len(y) == 0:
@@ -223,16 +247,12 @@ class HierarchicalNeuralClassifier:
             y_one_hot = encoder.transform(y.reshape(-1, 1))
             num_epochs = self.start if epoch == 0 else self.timeout
             epoch += num_epochs
-
-            model.fit(
+            self.print(f'epoch {epoch}')
+            self.models[node.name].fit(
                 self.X[mask], y_one_hot, epochs=num_epochs,
                 verbose=self.verbose > 1, batch_size=self.batch_size)
-            self.print(f'epoch {epoch}')
-            y_pred = model.predict(self.X[mask])
 
-            if self.log_output:
-                fname = join(current_folder, f'predictions_epoch{epoch}.csv')
-                savetxt(fname, y_pred, delimiter=',')
+            y_pred = model.predict(self.X[mask])
 
             self.print(f'Performing voting, epoch {epoch}')
             class_map = voter.vote(y, y_pred, classes)
@@ -244,15 +264,29 @@ class HierarchicalNeuralClassifier:
             self.print('New mapping', class_map)
             self.print('Total mapping', old_map)
             old_classes = sorted(list(set(y)))
+
+            if self.log_output:
+                fname = join(current_folder, 
+                             f'predictions_epoch{format_number(epoch)}.csv')
+                classes_fname = join(current_folder,
+                                     f'labels{format_number(epoch)}.csv')
+                map_fname = join(current_folder, f'class_map{epoch}.yaml')
+                savetxt(fname, y_pred, delimiter=',')
+                savetxt(classes_fname, y.astype('int64'), delimiter=',')
+
+                with open(map_fname, 'w', encoding='utf-8') as file:
+                    yaml_dump(class_map, file)
+
             y = remap(y, class_map)
             classes = sorted(list(set(y)))
             self.print('{} - > {}'.format(old_classes, classes), '\n')
 
         y_one_hot = encoder.transform(y.reshape(-1, 1))
         self.print('Performing end fit')
-        model.fit(self.X[mask], y_one_hot, epochs=self.end_fit,
-                  batch_size=self.batch_size, verbose=self.verbose > 1)
-        self.models[node.name] = model
+        self.models[node.name].fit(
+            self.X[mask], y_one_hot, epochs=self.end_fit,
+            batch_size=self.batch_size, verbose=self.verbose > 1)
+        
         self.class_maps[node.name] = old_map
 
         subsets = get_subsets(old_map)
@@ -317,3 +351,35 @@ class HierarchicalNeuralClassifier:
     def visualize(self, mode='classes'):
         return visualize_tree(self.tree, mode, self.node_to_class,
                               self.node_to_classes)
+
+    def to_yaml(self, fname):
+        dct = DictExporter().export(self.tree)
+        with open(fname, 'w', encoding='utf-8') as file:
+            yaml_dump(dct, file)
+
+    def _get_activation_history(self, node):
+        if not self.log_output:
+            raise ValueError('Logging has not been made!')
+        found_node = find(self.tree, filter_=lambda n: n.name == node, 
+                          stop=None, maxlevel=None)
+
+        if found_node is None:
+            raise ValueError('''No such node in the tree, try using .visualize_tree() 
+                                method to understand structure of the tree''')
+
+        folder = join(self.log_output_folder,
+                      '/'.join(str(n.name) for n in found_node.path))
+
+
+        return get_activation_history_from_folder(folder)
+
+    def get_activations_aggregate(self, node, classes_subset=None, classes_names=None):
+        pass
+
+
+
+
+
+
+
+

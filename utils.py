@@ -72,3 +72,8 @@ def reset_weights(model):
             layer.kernel.initializer.run(session=session)
         if hasattr(layer, 'bias_initializer'):
             layer.bias.initializer.run(session=session)
+
+def format_number(number, n_digits=4):
+    number = str(number)
+    length = len(number)
+    return '0' * (n_digits - length) + number
