@@ -1,10 +1,11 @@
 from tensorflow.keras.layers import Dense
 import tensorflow.keras.optimizers as optimizers
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.models import clone_model
+from tensorflow.keras.models import clone_model, load_model
 from sklearn.preprocessing import OneHotEncoder
 from anytree import Node
 from anytree.exporter import DictExporter
+from anytree.importer import DictImporter
 
 from numpy import concatenate, savetxt, arange
 
@@ -16,6 +17,9 @@ from os import mkdir
 from os.path import join
 from json import dump
 from yaml import dump as yaml_dump
+from yaml import load as yaml_load
+from joblib import dump as joblib_dump
+from joblib import load as joblib_load
 
 from anytree.search import find
 
@@ -122,6 +126,7 @@ class HierarchicalNeuralClassifier:
         self.node_counter = 0
         classes = list(set(y))
         self._K = len(classes)
+        self._fitted = False
         self.log_output_folder = log_output_folder
 
         if self.log_output_folder is not None:
@@ -138,6 +143,7 @@ class HierarchicalNeuralClassifier:
             self.to_yaml(join(self.log_output_folder, '0', 'tree.yaml'))
 
         del self.X
+        self._fitted = True
         return self
 
     def _fit_terminal_node(self, classes, node):
@@ -375,6 +381,78 @@ class HierarchicalNeuralClassifier:
 
     def get_activations_aggregate(self, node, classes_subset=None, classes_names=None):
         pass
+
+    def save(self, dirname):
+        if not self._fitted:
+            raise ValueError('Model is not fitted! Nothing to save')
+
+        mkdir(dirname)
+        self.to_yaml(join(dirname, 'tree.yaml'))
+
+        with open(join(dirname, 'node_to_classes.yaml'), 'w', encoding='utf-8') as file:
+            yaml_dump(self.node_to_classes, file)
+
+        with open(join(dirname, 'node_to_class.yaml'), 'w', encoding='utf-8') as file:
+            yaml_dump(self.node_to_class, file)
+
+        with open(join(dirname, 'class_maps.yaml'), 'w', encoding='utf-8') as file:
+            yaml_dump(self.class_maps, file)
+
+        models_dct = {}
+        models_dirname = join(dirname, 'models')
+        mkdir(models_dirname)
+        for node_id, model in self.models.items():
+            fname = join(models_dirname, f'model{node_id}')
+            model.save(fname)
+            models_dct[node_id] = fname
+        with open(join(models_dirname, 'models_fnames.yaml'), 'w', encoding='utf-8') as file:
+            yaml_dump(models_dct, file)
+
+        encoders_dct = {}
+        encoders_dirname = join(dirname, 'encoders')
+        mkdir(encoders_dirname)
+        for node_id, encoder in self.encoders.items():
+            fname = join(encoders_dirname, f'encoder{node_id}.sav')
+            joblib_dump(encoder, fname)
+            encoders_dct[node_id] = fname
+        with open(join(encoders_dirname, 'encoders_fnames.yaml'), 'w', encoding='utf-8') as file:
+            yaml_dump(encoders_dct, file)
+
+    def load(self, dirname):
+        importer = DictImporter()
+        with open(join(dirname, 'tree.yaml'), 'r', encoding='utf-8') as file:
+            self.tree = importer.import_(yaml_load(file))
+
+        with open(join(dirname, 'node_to_classes.yaml'), 'r', encoding='utf-8') as file:
+            self.node_to_classes = yaml_load(file)
+
+        with open(join(dirname, 'node_to_class.yaml'), 'r', encoding='utf-8') as file:
+            self.node_to_class = yaml_load(file)
+
+        with open(join(dirname, 'class_maps.yaml'), 'r', encoding='utf-8') as file:
+            self.class_maps = yaml_load(file)
+
+        self.models = {}
+        models_dirname = join(dirname, 'models')
+        with open(join(models_dirname, 'models_fnames.yaml'), 'r', encoding='utf-8') as file:
+            models_dct = yaml_load(file)
+        for node_id, fname in models_dct.items():
+            self.models[node_id] = load_model(fname)
+
+        self.encoders = {} 
+        encoders_dirname = join(dirname, 'encoders')
+        with open(join(encoders_dirname, 'encoders_fnames.yaml'), 'r', encoding='utf-8') as file:
+            encoders_dct = yaml_load(file)
+        for node_id, fname in encoders_dct.items():
+            self.encoders[node_id]= joblib_load(fname)
+        
+
+
+
+
+
+
+
 
 
 
