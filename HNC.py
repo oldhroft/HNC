@@ -11,7 +11,10 @@ from numpy import concatenate, savetxt, arange
 
 from utils import *
 from voter import *
-from visualization import visualize_tree, get_activation_history_from_folder
+from visualization import (
+    visualize_tree, visualize_tree_dot,
+    get_activation_history_from_folder
+)
 
 from os import mkdir
 from os.path import join
@@ -154,7 +157,7 @@ class HierarchicalNeuralClassifier:
             current_folder = join(self.log_output_folder,
                                   '/'.join(str(n.name) for n in node.path))
             mkdir(current_folder)
-            with open(join(current_folder, f'node{node.name}.json'), 
+            with open(join(current_folder, f'node.json'), 
                       'w', encoding='utf-8') as node_info_file:
                 node_info = {
                     'name': str(node.name),
@@ -198,7 +201,7 @@ class HierarchicalNeuralClassifier:
             current_folder = join(self.log_output_folder,
                                   '/'.join(str(n.name) for n in node.path))
             mkdir(current_folder)
-            with open(join(current_folder, f'node{node.name}.json'),
+            with open(join(current_folder, f'node.json'),
                       'w', encoding='utf-8') as node_info_file:
                 node_info = {
                     'name': str(node.name),
@@ -354,9 +357,13 @@ class HierarchicalNeuralClassifier:
     def predict(self, X):
         return self._predict_node(X, self.tree)
 
-    def visualize(self, mode='classes'):
-        return visualize_tree(self.tree, mode, self.node_to_class,
-                              self.node_to_classes)
+    def visualize(self, mode='classes', filename=None):
+        if filename is None:
+            return visualize_tree(self.tree, mode, self.node_to_class,
+                                  self.node_to_classes)
+        else:
+            return visualize_tree_dot(self.tree, mode, self.node_to_class,
+                                      self.node_to_classes, filename)
 
     def to_yaml(self, fname):
         dct = DictExporter().export(self.tree)
@@ -445,19 +452,3 @@ class HierarchicalNeuralClassifier:
             encoders_dct = yaml_load(file)
         for node_id, fname in encoders_dct.items():
             self.encoders[node_id]= joblib_load(fname)
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,0 +1,5 @@
+*.ipynb
+*.txt
+*.json
+exp
+__pycache__
