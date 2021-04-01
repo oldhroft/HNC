@@ -1,7 +1,7 @@
 import numpy as np
 from tensorflow.keras.models import clone_model
 
-from utils import reset_weights
+from utils import reset_weights, parse_std
 
 
 def perform_voting(
@@ -55,20 +55,16 @@ class Voter:
     def build_voter(self, X=None, model=None):
         if isinstance(self.strategy, float):
             self.threshold = self.strategy
-        elif self.strategy == 'mean':
-            self.threshold = 1 / len(self.default_classes)
-        elif self.strategy == 'std':
-            model = clone_model(model)
+        elif self.strategy[-3: ] == 'std':
+            coef = parse_std(self.strategy, default=1)
             if X is None:
                 raise ValueError(
                     'X should be specified when strategy = "std"')
-            threshold = 1 / len(self.default_classes)
-            total_std = 0
-            for init in range(self.n_inits):
-                reset_weights(model)
-                total_std += model.predict(X).std()
-            threshold += total_std / self.n_inits
+
+            preds = model.predict(X)
+            threshold = preds.mean() + coef * preds.std()
             self.threshold = threshold
+            
         elif self.strategy == 'compromise':
             total = sum(1 / i for i in range(3, self.total_classes + 1))
             self.threshold = total / self.total_classes

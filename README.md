@@ -5,6 +5,7 @@ Hierarchical Neural Classifier
 
 `pip install anytree`
 
+[Colab с демо](https://colab.research.google.com/drive/1AiPsOnF8BasPUC_aHAmyQMY3-7UfPmAU?usp=sharing)
 
 Основной класс - HierarchicalNeuralClassifier
 

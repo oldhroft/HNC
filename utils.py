@@ -73,7 +73,16 @@ def reset_weights(model):
         if hasattr(layer, 'bias_initializer'):
             layer.bias.initializer.run(session=session)
 
+
 def format_number(number, n_digits=4):
     number = str(number)
     length = len(number)
     return '0' * (n_digits - length) + number
+
+
+def parse_std(x, default):
+    splitted = x.split('*')
+    if len(splitted) == 1:
+        return default
+    else:
+        return float(splitted[0])
