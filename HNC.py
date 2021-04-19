@@ -26,6 +26,7 @@ from joblib import load as joblib_load
 
 from anytree.search import find
 
+
 class HierarchicalNeuralClassifier:
 
     def __init__(
@@ -314,6 +315,7 @@ class HierarchicalNeuralClassifier:
                 pass
 
     def refit(self, X, y, backbone, units=2, epochs=10):
+        self.input_shape = (X.shape[1],)
         self.backbone = backbone
         self.units = units
         for node_id in self.models:
@@ -378,16 +380,13 @@ class HierarchicalNeuralClassifier:
 
         if found_node is None:
             raise ValueError('''No such node in the tree, try using .visualize_tree() 
-                                method to understand structure of the tree''')
+                                method to understand the structure of the tree''')
 
         folder = join(self.log_output_folder,
                       '/'.join(str(n.name) for n in found_node.path))
 
 
         return get_activation_history_from_folder(folder)
-
-    def get_activations_aggregate(self, node, classes_subset=None, classes_names=None):
-        pass
 
     def save(self, dirname):
         if not self._fitted:
@@ -409,8 +408,8 @@ class HierarchicalNeuralClassifier:
         models_dirname = join(dirname, 'models')
         mkdir(models_dirname)
         for node_id, model in self.models.items():
-            fname = join(models_dirname, f'model{node_id}')
-            model.save(fname)
+            fname = f'model{node_id}'
+            model.save(join(models_dirname, fname))
             models_dct[node_id] = fname
         with open(join(models_dirname, 'models_fnames.yaml'), 'w', encoding='utf-8') as file:
             yaml_dump(models_dct, file)
@@ -419,8 +418,8 @@ class HierarchicalNeuralClassifier:
         encoders_dirname = join(dirname, 'encoders')
         mkdir(encoders_dirname)
         for node_id, encoder in self.encoders.items():
-            fname = join(encoders_dirname, f'encoder{node_id}.sav')
-            joblib_dump(encoder, fname)
+            fname = f'encoder{node_id}.sav'
+            joblib_dump(encoder, join(encoders_dirname, fname))
             encoders_dct[node_id] = fname
         with open(join(encoders_dirname, 'encoders_fnames.yaml'), 'w', encoding='utf-8') as file:
             yaml_dump(encoders_dct, file)
@@ -444,11 +443,13 @@ class HierarchicalNeuralClassifier:
         with open(join(models_dirname, 'models_fnames.yaml'), 'r', encoding='utf-8') as file:
             models_dct = yaml_load(file)
         for node_id, fname in models_dct.items():
-            self.models[node_id] = load_model(fname)
+            model_path = join(models_dirname, fname)
+            self.models[node_id] = load_model(model_path)
 
         self.encoders = {} 
         encoders_dirname = join(dirname, 'encoders')
         with open(join(encoders_dirname, 'encoders_fnames.yaml'), 'r', encoding='utf-8') as file:
             encoders_dct = yaml_load(file)
         for node_id, fname in encoders_dct.items():
-            self.encoders[node_id]= joblib_load(fname)
+            encoder_path = join(encoders_dirname, fname)
+            self.encoders[node_id]= joblib_load(encoder_path)
