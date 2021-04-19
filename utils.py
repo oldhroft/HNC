@@ -3,6 +3,10 @@ import numpy as np
 
 import tensorflow.keras.backend as K
 
+from yaml import load as yaml_load
+from anytree.importer import DictImporter
+from os.path import join
+
 
 def connect_map(old_map: dict, new_map: dict) -> dict:
     if len(set(new_map.values())) > 1:
@@ -86,3 +90,21 @@ def parse_std(x, default):
         return default
     else:
         return float(splitted[0])
+
+
+def load_tree(dirname):
+    importer = DictImporter()
+    with open(join(dirname, 'tree.yaml'), 'r', encoding='utf-8') as file:
+        tree = importer.import_(yaml_load(file))
+
+    with open(join(dirname, 'node_to_classes.yaml'), 'r', encoding='utf-8') as file:
+        node_to_classes = yaml_load(file)
+
+    with open(join(dirname, 'node_to_class.yaml'), 'r', encoding='utf-8') as file:
+        node_to_class = yaml_load(file)
+
+    with open(join(dirname, 'class_maps.yaml'), 'r', encoding='utf-8') as file:
+        class_maps = yaml_load(file)
+
+    return tree, node_to_class, node_to_classes, class_maps
+

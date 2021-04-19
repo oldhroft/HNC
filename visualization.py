@@ -3,7 +3,9 @@ from anytree import PreOrderIter
 from anytree.exporter import DotExporter
 from copy import deepcopy
 
-def visualize_tree(tree, mode, node_to_class, node_to_classes):
+from utils import load_tree
+
+def visualize_tree_text(tree, mode, node_to_class, node_to_classes):
     if mode == 'ids':
         return str(RenderTree(tree))
     elif isinstance(mode, dict):
@@ -60,6 +62,20 @@ def visualize_tree_dot(tree, mode, node_to_class, node_to_classes, filename):
         raise ValueError(f'No mode named {mode}')
 
     DotExporter(tree).to_picture(filename)
+    return filename
+
+def visualize_tree(tree, mode, node_to_class, node_to_classes, filename):
+    if filename is None:
+        return visualize_tree_text(tree, mode, node_to_class,
+                                   node_to_classes)
+    else:
+        return visualize_tree_dot(tree, mode, node_to_class,
+                                  node_to_classes, filename)
+
+def visualize_tree_from_dir(dirname, mode, filename=None):
+    tree, node_to_class, node_to_classes, _ = load_tree(dirname)
+    return visualize_tree(tree, mode, node_to_class, node_to_classes, filename)
+
 
 from glob import glob
 from os.path import join

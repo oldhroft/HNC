@@ -360,12 +360,8 @@ class HierarchicalNeuralClassifier:
         return self._predict_node(X, self.tree)
 
     def visualize(self, mode='classes', filename=None):
-        if filename is None:
-            return visualize_tree(self.tree, mode, self.node_to_class,
-                                  self.node_to_classes)
-        else:
-            return visualize_tree_dot(self.tree, mode, self.node_to_class,
-                                      self.node_to_classes, filename)
+        return visualize_tree(self.tree, mode, self.node_to_class,
+                              self.node_to_classes, filename)
 
     def to_yaml(self, fname):
         dct = DictExporter().export(self.tree)
@@ -426,17 +422,7 @@ class HierarchicalNeuralClassifier:
 
     def load(self, dirname):
         importer = DictImporter()
-        with open(join(dirname, 'tree.yaml'), 'r', encoding='utf-8') as file:
-            self.tree = importer.import_(yaml_load(file))
-
-        with open(join(dirname, 'node_to_classes.yaml'), 'r', encoding='utf-8') as file:
-            self.node_to_classes = yaml_load(file)
-
-        with open(join(dirname, 'node_to_class.yaml'), 'r', encoding='utf-8') as file:
-            self.node_to_class = yaml_load(file)
-
-        with open(join(dirname, 'class_maps.yaml'), 'r', encoding='utf-8') as file:
-            self.class_maps = yaml_load(file)
+        self.tree, self.node_to_class, self.node_to_classes, self.class_maps = load_tree(dirname)
 
         self.models = {}
         models_dirname = join(dirname, 'models')
