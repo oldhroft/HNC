@@ -41,10 +41,14 @@ def visualize_tree_dot(tree, mode, node_to_class, node_to_classes, filename):
         pass
     elif isinstance(mode, dict):
         for node in PreOrderIter(tree):
-            node.name = classes.get(node_to_class[node.name], 'root') + '_' + \
-               str(node.name)
-    elif mode == 'classes':
+            if not node.is_leaf:
+                node.name = mode.get(node_to_class[node.name], 'root') + '_' + \
+                    str(node.name)
+            else:
+                node.name = mode.get(node_to_classes[node.name][0], 'root') + '_' + \
+                    str(node.name)
 
+    elif mode == 'classes':
         for node in PreOrderIter(tree):
             node.name =  ''.join([
                 str(node_to_class.get(node.name, 'root')),
