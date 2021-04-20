@@ -223,7 +223,7 @@ class HierarchicalNeuralClassifier:
 
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
-        print(f'Example rate {mask.sum() / mask.shape[0]}')
+        self.print(f'Example rate {mask.sum() / mask.shape[0]}')
         y = self.y[mask].copy()
         encoder.fit(y.reshape(-1, 1))
         self.encoders[node.name] = encoder
