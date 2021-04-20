@@ -4,8 +4,11 @@ import numpy as np
 import tensorflow.keras.backend as K
 
 from yaml import load as yaml_load
+from yaml import dump as yaml_dump
 from anytree.importer import DictImporter
+from anytree.exporter import DictExporter
 from os.path import join
+from os import mkdir
 
 
 def connect_map(old_map: dict, new_map: dict) -> dict:
@@ -90,6 +93,26 @@ def parse_std(x, default):
         return default
     else:
         return float(splitted[0])
+
+
+def to_yaml(tree, fname):
+    dct = DictExporter().export(tree)
+    with open(fname, 'w', encoding='utf-8') as file:
+        yaml_dump(dct, file)
+
+
+def save_tree(tree, node_to_class, node_to_classes, class_maps, dirname):
+    mkdir(dirname)
+    to_yaml(tree, join(dirname, 'tree.yaml'))
+
+    with open(join(dirname, 'node_to_class.yaml'), 'w', encoding='utf-8') as file:
+        yaml_dump(node_to_class, file)
+
+    with open(join(dirname, 'node_to_classes.yaml'), 'w', encoding='utf-8') as file:
+        yaml_dump(node_to_classes, file)
+
+    with open(join(dirname, 'class_maps.yaml'), 'w', encoding='utf-8') as file:
+        yaml_dump(class_maps, file)
 
 
 def load_tree(dirname):

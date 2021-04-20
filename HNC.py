@@ -144,8 +144,10 @@ class HierarchicalNeuralClassifier:
         self._fit_node(classes, self.tree)
 
         if self.log_output:
-            self.to_yaml(join(self.log_output_folder, '0', 'tree.yaml'))
-
+            save_tree(self.tree, self.node_to_class, 
+                      self.node_to_classes, self.class_maps,
+                      join(self.log_output_folder, 'tree'))
+            
         del self.X
         self._fitted = True
         return self
@@ -363,11 +365,6 @@ class HierarchicalNeuralClassifier:
         return visualize_tree(self.tree, mode, self.node_to_class,
                               self.node_to_classes, filename)
 
-    def to_yaml(self, fname):
-        dct = DictExporter().export(self.tree)
-        with open(fname, 'w', encoding='utf-8') as file:
-            yaml_dump(dct, file)
-
     def _get_activation_history(self, node):
         if not self.log_output:
             raise ValueError('Logging has not been made!')
@@ -389,16 +386,9 @@ class HierarchicalNeuralClassifier:
             raise ValueError('Model is not fitted! Nothing to save')
 
         mkdir(dirname)
-        self.to_yaml(join(dirname, 'tree.yaml'))
-
-        with open(join(dirname, 'node_to_classes.yaml'), 'w', encoding='utf-8') as file:
-            yaml_dump(self.node_to_classes, file)
-
-        with open(join(dirname, 'node_to_class.yaml'), 'w', encoding='utf-8') as file:
-            yaml_dump(self.node_to_class, file)
-
-        with open(join(dirname, 'class_maps.yaml'), 'w', encoding='utf-8') as file:
-            yaml_dump(self.class_maps, file)
+        save_tree(self.tree, self.node_to_class, self.node_to_classes,
+                  self.class_maps,
+                  join(dirname, 'tree'))
 
         models_dct = {}
         models_dirname = join(dirname, 'models')
@@ -422,7 +412,10 @@ class HierarchicalNeuralClassifier:
 
     def load(self, dirname):
         importer = DictImporter()
-        self.tree, self.node_to_class, self.node_to_classes, self.class_maps = load_tree(dirname)
+        (
+            self.tree, self.node_to_class, 
+            self.node_to_classes, self.class_maps
+        ) = load_tree(join(dirname, 'tree'))
 
         self.models = {}
         models_dirname = join(dirname, 'models')
@@ -439,3 +432,6 @@ class HierarchicalNeuralClassifier:
         for node_id, fname in encoders_dct.items():
             encoder_path = join(encoders_dirname, fname)
             self.encoders[node_id]= joblib_load(encoder_path)
+
+        self._fitted = True
+
