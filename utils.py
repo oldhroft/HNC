@@ -100,6 +100,11 @@ def to_yaml(tree, fname):
     with open(fname, 'w', encoding='utf-8') as file:
         yaml_dump(dct, file)
 
+def read_yaml(file):
+    with open(file, encoding='utf-8', mode='r') as file:
+        content = yaml_load(file)
+    return content
+
 
 def save_tree(tree, node_to_class, node_to_classes, class_maps, dirname):
     mkdir(dirname)

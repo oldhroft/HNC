@@ -91,3 +91,53 @@ def get_activation_history_from_folder(folder):
     )
     
     return activations
+
+
+from pandas import DataFrame
+from matplotlib.pyplot import subplots
+
+def plot_class_merge(class_merge, classes, ax=None, **kwargs):
+    defaults = dict(
+        color='black', ls='--', marker='o', figsize=(8, 4),
+    )
+
+    defaults.update(kwargs)
+    if ax is None:
+        _, ax = subplots()
+
+    DataFrame(class_merge).plot(ax=ax, **defaults)
+
+    ax.set_xticks(list(range(len(class_merge))))
+    ax.set_yticks(ticks=list(range(len(classes))))
+    ax.set_yticklabels(classes)
+    ax.legend([])
+    ax.set_xlabel('Epoch')
+    ax.grid(axis='y')
+    return ax
+
+def plot_class_merges(class_merges, classes, grid, sharex=False, sharey=True,
+                      include_class_name=False, node_to_class=None,
+                      **kwargs):
+    if include_class_name and node_to_class is None:
+        raise ValueError('Node to class must be included when include_class_name=True')
+    n = len(class_merges)
+    if grid[0] * grid[1] < n:
+        raise ValueError('Grid mismatch with number of merge diagrams!')
+    
+    f, ax = subplots(grid[0], grid[1], sharex=sharex, sharey=sharey)
+    k = 0
+    items_list = list(class_merges.items())
+    for i in range(grid[0]):
+        for j in range(grid[1]):
+            if k < n:
+                key, data = items_list[k]
+                if include_class_name:
+                    class_id = node_to_class[key]
+                    class_name = classes[class_id] if class_id != 'root' else 'root'
+                    key = '{}_{}'.format(class_name, key)
+                plot_class_merge(data, classes, ax=ax[i][j], **kwargs)
+                ax[i][j].set_title(key)
+                k += 1
+            else:
+                ax[i][j].axis('off')
+    return f, ax
