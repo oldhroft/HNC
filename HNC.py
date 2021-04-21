@@ -282,7 +282,8 @@ class HierarchicalNeuralClassifier:
                              f'predictions_epoch{format_number(epoch)}.csv')
                 classes_fname = join(current_folder,
                                      f'labels{format_number(epoch)}.csv')
-                map_fname = join(current_folder, f'class_map{epoch}.yaml')
+                map_fname = join(current_folder, 
+                                 f'class_map{format_number(epoch)}.yaml')
                 savetxt(fname, y_pred, delimiter=',')
                 savetxt(classes_fname, y.astype('int64'), delimiter=',')
 
