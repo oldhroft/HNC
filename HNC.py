@@ -341,7 +341,7 @@ class HierarchicalNeuralClassifier:
 
     def _predict_node(self, x, node):
         if node.is_leaf:
-            return np.ones(len(x)) * self.node_to_class[node.name]
+            return np.ones(len(x)) * self.node_to_classes[node.name][0]
         else:
 
             preds = self.models[node.name].predict(x)
