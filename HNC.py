@@ -23,8 +23,6 @@ from yaml import load as yaml_load
 from joblib import dump as joblib_dump
 from joblib import load as joblib_load
 
-from anytree.search import find
-
 
 class HierarchicalNeuralClassifier:
 
@@ -60,25 +58,6 @@ class HierarchicalNeuralClassifier:
         self.backbone = backbone
         self.end_fit = end_fit
 
-    def _get_optimizer(self):
-
-        if self.optimizer == 'sgd':
-            return optimizers.SGD(**self.optimizer_params)
-        elif self.optimizer == 'adam':
-            return optimizers.Adam(**self.optimizer_params)
-        elif self.optimizer == 'adagrad':
-            return optimizers.Adagrad(**self.optimizer_params)
-        elif self.optimizer == 'adadelta':
-            return optimizers.Adadelta(**self.optimizer_params)
-        elif self.optimizer == 'adax':
-            return optimizers.Adamax(**self.optimizer_params)
-        elif self.optimizer == 'nadam':
-            return optimizers.Nadam(**self.optimizer_params)
-        elif self.optimizer == 'rmsprop':
-            return optimizer.RMSprop(**self.optimizer_params)
-        else:
-            raise ValueError(f'No optimizer named {self.optimizer}')
-
     def _build_model(self, units, output_shape,
                      input_shape=None, backbone=None):
 
@@ -108,7 +87,7 @@ class HierarchicalNeuralClassifier:
 
         model.compile(
             loss=self.loss,
-            optimizer=self._get_optimizer()
+            optimizer=optimizers.get(self.optimizer).from_config(self.optimizer_params)
         )
         return model
 
@@ -126,8 +105,6 @@ class HierarchicalNeuralClassifier:
             raise ValueError(f'No class_map to log at epoch {epoch}')
 
         if self.log_output:
-
-
             current_folder = join(self.log_output_folder,
                                   '/'.join(str(n.name) for n in node.path))
             if not exists(current_folder):
@@ -148,7 +125,6 @@ class HierarchicalNeuralClassifier:
             if class_map is not None:
                 with open(map_fname, 'w', encoding='utf-8') as file:
                     yaml_dump(class_map, file)
-
 
 
     def fit(self, X, y, verbose=1, log_output_folder=None):
@@ -249,7 +225,6 @@ class HierarchicalNeuralClassifier:
         indices = arange(self.X.shape[0], dtype='int64')[mask].reshape(-1, 1)
         self.log(node, epoch, y_pred, y, indices=indices)
 
-
         while not stop_flag and epoch < self.max_epochs:
             if len(y) == 0:
                 raise ValueError('Empty targets')
@@ -330,7 +305,6 @@ class HierarchicalNeuralClassifier:
         if node.is_leaf:
             return np.ones(len(x)) * self.node_to_classes[node.name][0]
         else:
-
             preds = self.models[node.name].predict(x)
             preds = (preds == preds.max(axis=1, keepdims=1)).astype('int')
             preds = self.encoders[node.name].inverse_transform(preds).ravel()
