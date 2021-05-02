@@ -4,6 +4,19 @@ from os.path import join
 from utils import read_yaml, load_tree, connect_map
 from visualization import plot_class_merge, plot_class_merges
 
+from numpy import array, loadtxt
+
+def get_activation_history(folder):
+    
+    files = glob(join(folder, 'predictions_epoch*.csv'))
+    
+    activations = array(
+        list(loadtxt(file, delimiter=',', encoding='utf-8') 
+             for file in sorted(files))
+    )
+    
+    return activations
+
 
 def get_available_paths(tree, dirname, node_to_classes):
 
@@ -23,6 +36,7 @@ def get_available_paths(tree, dirname, node_to_classes):
         
     return available_paths
 
+
 class LogReader:
 
     def __init__(self, dirname, classes=None):
@@ -37,16 +51,17 @@ class LogReader:
         
         self.classes = classes if classes is not None else self.node_to_classes[0]
     
-    def _check_node(self, node_id):
+    def _check_node_and_get_folder(self, node_id):
         if node_id not in self.available_ids:
-            raise ValueError(f'No folder for node {node_id} avalailable'
-                              '\nTry using .available_ids.keys() to see them')
+            raise KeyError(f'No folder for node {node_id} avalailable'
+                            '\nTry using .available_ids.keys() to see them')
+        else:
+            return self.available_ids[node_id]
+
 
     def read_class_merge(self, node_id):
-        self._check_node(node_id)
         
-        folder = self.available_ids[node_id]
-
+        folder = self._check_node_and_get_folder(node_id)
         files = sorted(glob(folder + '/class_map*.yaml'))
         class_maps = list(map(read_yaml, files))
         
@@ -75,3 +90,8 @@ class LogReader:
         return plot_class_merges(class_merges, self.classes, grid, sharex, sharey,
                                  include_class_name, self.node_to_class,
                                  **kwargs)
+
+    def get_activation_history(self, node_id):
+        folder = self._check_node_and_get_folder(node_id)
+        return get_activation_history(folder)
+

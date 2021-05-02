@@ -13,11 +13,10 @@ from utils import *
 from voter import *
 from visualization import (
     visualize_tree, visualize_tree_dot,
-    get_activation_history_from_folder
 )
 
 from os import mkdir
-from os.path import join
+from os.path import join, exists
 from json import dump
 from yaml import dump as yaml_dump
 from yaml import load as yaml_load
@@ -117,6 +116,41 @@ class HierarchicalNeuralClassifier:
         if self.verbose:
             print(*args, **kwargs)
 
+
+    def log(self, node, epoch, y_pred, y, 
+            indices=None, class_map=None):
+
+        if epoch == 0 and indices is None:
+            raise ValueError('No indices to log at epoch 0')
+        if epoch > 0 and class_map is None:
+            raise ValueError(f'No class_map to log at epoch {epoch}')
+
+        if self.log_output:
+
+
+            current_folder = join(self.log_output_folder,
+                                  '/'.join(str(n.name) for n in node.path))
+            if not exists(current_folder):
+                mkdir(current_folder)
+
+            fname = join(current_folder, 
+                         f'predictions_epoch{format_number(epoch)}.csv')
+            indices_fname = join(current_folder, 'indices.csv')
+            classes_fname = join(current_folder,
+                                 f'labels{format_number(epoch)}.csv')
+            map_fname = join(current_folder, 
+                             f'class_map{format_number(epoch)}.yaml')
+
+            savetxt(fname, y_pred, delimiter=',')
+            savetxt(classes_fname, y.astype('int64'), delimiter=',')
+            if indices is not None:
+                savetxt(indices_fname, indices, delimiter=',')
+            if class_map is not None:
+                with open(map_fname, 'w', encoding='utf-8') as file:
+                    yaml_dump(class_map, file)
+
+
+
     def fit(self, X, y, verbose=1, log_output_folder=None):
         self.models = {}
         self.X = X
@@ -155,21 +189,6 @@ class HierarchicalNeuralClassifier:
     def _fit_terminal_node(self, classes, node):
         self.print('\n\n', '-' * 50, sep='')
         self.print(f"Fitting terminal node with classes {classes}")
-        if self.log_output:
-
-            current_folder = join(self.log_output_folder,
-                                  '/'.join(str(n.name) for n in node.path))
-            mkdir(current_folder)
-            with open(join(current_folder, f'node.json'), 
-                      'w', encoding='utf-8') as node_info_file:
-                node_info = {
-                    'name': str(node.name),
-                    'class_name': str(self.node_to_class[node.name]),
-                    'parent': 'nan' if node.is_root else str(node.parent.name),
-                    'classes': str(classes),
-                    'fullpath':  str(node),
-                }
-                dump(node_info, node_info_file)
 
         mask = create_mask(
             self.y, classes, other_rate=self.other_rate)
@@ -199,23 +218,6 @@ class HierarchicalNeuralClassifier:
         self.print('\n\n', '-' * 50, sep='')
         self.print(f"Fitting node with classes {classes}")
 
-        if self.log_output:
-
-            current_folder = join(self.log_output_folder,
-                                  '/'.join(str(n.name) for n in node.path))
-            mkdir(current_folder)
-            with open(join(current_folder, f'node.json'),
-                      'w', encoding='utf-8') as node_info_file:
-                node_info = {
-                    'name': str(node.name),
-                    'class_name': str(self.node_to_class[node.name]),
-                    'parent': 'nan' if node.is_root else str(node.parent.name),
-                    'classes': str(classes),
-                    'fullpath':  str(node),
-                }
-                dump(node_info, node_info_file)
-
-
         encoder = OneHotEncoder(categories='auto', sparse=False)
         voter = Voter(classes, strategy=self.threshold,
                       threshold_ratio=self.threshold_ratio,
@@ -239,17 +241,13 @@ class HierarchicalNeuralClassifier:
         epoch = 0
 
         if self.log_output:
-            y_pred = self.models[node.name].predict(self.X[mask])
-            fname = join(current_folder, 
-                         f'predictions_epoch{format_number(epoch)}.csv')
-            indices_fname = join(current_folder, 'indices.csv')
-            classes_fname = join(current_folder,
-                                 f'labels{format_number(epoch)}.csv')
-            indices = arange(self.X.shape[0], dtype='int64')[mask].reshape(-1, 1)
+            current_folder = join(self.log_output_folder,
+                                  '/'.join(str(n.name) for n in node.path))
+            mkdir(current_folder)
 
-            savetxt(fname, y_pred, delimiter=',')
-            savetxt(indices_fname, indices, delimiter=',')
-            savetxt(classes_fname, y.astype('int64'), delimiter=',')
+        y_pred = self.models[node.name].predict(self.X[mask])
+        indices = arange(self.X.shape[0], dtype='int64')[mask].reshape(-1, 1)
+        self.log(node, epoch, y_pred, y, indices=indices)
 
 
         while not stop_flag and epoch < self.max_epochs:
@@ -277,18 +275,7 @@ class HierarchicalNeuralClassifier:
             self.print('Total mapping', old_map)
             old_classes = sorted(list(set(y)))
 
-            if self.log_output:
-                fname = join(current_folder, 
-                             f'predictions_epoch{format_number(epoch)}.csv')
-                classes_fname = join(current_folder,
-                                     f'labels{format_number(epoch)}.csv')
-                map_fname = join(current_folder, 
-                                 f'class_map{format_number(epoch)}.yaml')
-                savetxt(fname, y_pred, delimiter=',')
-                savetxt(classes_fname, y.astype('int64'), delimiter=',')
-
-                with open(map_fname, 'w', encoding='utf-8') as file:
-                    yaml_dump(class_map, file)
+            self.log(node, epoch, y_pred, y, class_map=class_map)
 
             y = remap(y, class_map)
             classes = sorted(list(set(y)))
@@ -365,22 +352,6 @@ class HierarchicalNeuralClassifier:
     def visualize(self, mode='classes', filename=None):
         return visualize_tree(self.tree, mode, self.node_to_class,
                               self.node_to_classes, filename)
-
-    def _get_activation_history(self, node):
-        if not self.log_output:
-            raise ValueError('Logging has not been made!')
-        found_node = find(self.tree, filter_=lambda n: n.name == node, 
-                          stop=None, maxlevel=None)
-
-        if found_node is None:
-            raise ValueError('''No such node in the tree, try using .visualize_tree() 
-                                method to understand the structure of the tree''')
-
-        folder = join(self.log_output_folder,
-                      '/'.join(str(n.name) for n in found_node.path))
-
-
-        return get_activation_history_from_folder(folder)
 
     def save(self, dirname):
         if not self._fitted:
