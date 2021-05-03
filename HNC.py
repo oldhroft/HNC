@@ -28,11 +28,9 @@ class HierarchicalNeuralClassifier:
 
     def __init__(
             self, units=3, activation='relu',
-            optimizer='sgd', optimizer_params={},
-            other_rate=.1, regularization=None,
+            optimizer='sgd', optimizer_params={}, regularization=None,
             timeout=10, start=5, max_epochs=20,
-            end_fit=10,
-            threshold=.2, threshold_ratio=.5,
+            end_fit=10, threshold=.2, threshold_ratio=.5,
             validation_split=None,
             patience=10, batch_size=32, verbose=1,
             loss='categorical_crossentropy',
@@ -90,6 +88,10 @@ class HierarchicalNeuralClassifier:
             optimizer=optimizers.get(self.optimizer).from_config(self.optimizer_params)
         )
         return model
+
+    def _check_if_fitted(self):
+        if not self._fitted:
+            raise ValueError('Model is not fitted!')
 
     def print(self, *args, **kwargs):
         if self.verbose:
@@ -199,8 +201,7 @@ class HierarchicalNeuralClassifier:
                       threshold_ratio=self.threshold_ratio,
                       total_classes=self._K)
 
-        mask = create_mask(
-            self.y, classes, other_rate=self.other_rate)
+        mask = create_mask(self.y, classes)
         self.print(f'Example rate {mask.sum() / mask.shape[0]}')
         y = self.y[mask].copy()
         encoder.fit(y.reshape(-1, 1))
@@ -280,6 +281,7 @@ class HierarchicalNeuralClassifier:
                 pass
 
     def refit(self, X, y, backbone, units=2, epochs=10):
+        self._check_if_fitted()
         self.input_shape = (X.shape[1],)
         self.backbone = backbone
         self.units = units
@@ -321,15 +323,16 @@ class HierarchicalNeuralClassifier:
             return preds[ids]
 
     def predict(self, X):
+        self._check_if_fitted()
         return self._predict_node(X, self.tree)
 
     def visualize(self, mode='classes', filename=None):
+        self._check_if_fitted()
         return visualize_tree(self.tree, mode, self.node_to_class,
                               self.node_to_classes, filename)
 
     def save(self, dirname):
-        if not self._fitted:
-            raise ValueError('Model is not fitted! Nothing to save')
+        self._check_if_fitted()
 
         mkdir(dirname)
         save_tree(self.tree, self.node_to_class, self.node_to_classes,

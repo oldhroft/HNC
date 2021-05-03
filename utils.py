@@ -58,16 +58,12 @@ def remap(y: np.array, a_map: dict) -> np.array:
 
 
 def to_one_hot(y: np.array, categories='auto') -> np.array:
-    encoder = OneHotEncoder(
-        categories=categories, sparse=False)
+    encoder = OneHotEncoder(categories=categories, sparse=False)
     return encoder.fit_transform(y.reshape(-1, 1))
 
-def create_mask(
-        y: np.array, classes: list,
-        other_rate: float) -> np.array:
+def create_mask(y: np.array, classes: list) -> np.array:
 
-    if not check_create_mask(y, classes):
-        raise KeyError
+    check_create_mask(y, classes)
     mask = np.isin(y, np.array(classes))
     return mask
 
