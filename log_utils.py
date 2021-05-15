@@ -2,7 +2,7 @@ from glob import glob
 from os.path import join
 
 from utils import read_yaml, load_tree, connect_map
-from visualization import plot_class_merge, plot_class_merges
+from visualization import plot_class_merge, plot_class_merges, visualize_tree_from_dir
 
 from numpy import array, loadtxt
 
@@ -94,4 +94,10 @@ class LogReader:
     def get_activation_history(self, node_id):
         folder = self._check_node_and_get_folder(node_id)
         return get_activation_history(folder)
+
+    def visualize(self, mode=None, filename=None):
+        folder = join(self.dirname, 'tree')
+        if mode is None:
+            mode = dict(zip(range(len(self.classes)), self.classes))
+        return visualize_tree_from_dir(folder, mode, filename)
 
