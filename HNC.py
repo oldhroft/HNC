@@ -50,7 +50,6 @@ class HierarchicalNeuralClassifier:
         self.batch_size = batch_size
         self.loss = loss
         self.max_epochs = max_epochs
-        self.other_rate = other_rate
         self.output_activation = output_activation
         self.verbose = verbose
         self.backbone = backbone
@@ -168,8 +167,7 @@ class HierarchicalNeuralClassifier:
         self.print('\n\n', '-' * 50, sep='')
         self.print(f"Fitting terminal node with classes {classes}")
 
-        mask = create_mask(
-            self.y, classes, other_rate=self.other_rate)
+        mask = create_mask(self.y, classes)
         y = self.y[mask].copy()
         encoder = OneHotEncoder(categories='auto', sparse=False)
         encoder.fit(y.reshape(-1, 1))
