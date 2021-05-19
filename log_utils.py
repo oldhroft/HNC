@@ -95,9 +95,11 @@ class LogReader:
         folder = self._check_node_and_get_folder(node_id)
         return get_activation_history(folder)
 
-    def visualize(self, mode=None, filename=None):
+    def visualize(self, mode=None, filename=None, node_id=None):
+        if node_id is not None:
+            self._check_node_and_get_folder(node_id)
         folder = join(self.dirname, 'tree')
         if mode is None:
             mode = dict(zip(range(len(self.classes)), self.classes))
-        return visualize_tree_from_dir(folder, mode, filename)
+        return visualize_tree_from_dir(folder, mode, filename, node_id)
 

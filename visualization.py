@@ -1,6 +1,7 @@
 from anytree import RenderTree
 from anytree import PreOrderIter
 from anytree.exporter import DotExporter
+from anytree.search import find_by_attr
 from copy import deepcopy
 
 from utils import load_tree
@@ -72,8 +73,10 @@ def visualize_tree(tree, mode, node_to_class, node_to_classes, filename):
         return visualize_tree_dot(tree, mode, node_to_class,
                                   node_to_classes, filename)
 
-def visualize_tree_from_dir(dirname, mode, filename=None):
+def visualize_tree_from_dir(dirname, mode, filename=None, node_id=None):
     tree, node_to_class, node_to_classes, _ = load_tree(dirname)
+    if node_id is not None:
+        tree = find_by_attr(tree, node_id)
     return visualize_tree(tree, mode, node_to_class, node_to_classes, filename)
 
 
